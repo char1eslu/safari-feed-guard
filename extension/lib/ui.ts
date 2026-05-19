@@ -115,12 +115,22 @@ svg { display: block; }
 @keyframes xshim { to { transform: translateX(100%); } }
 @keyframes xpulse { 0%,100% { opacity: .55; } 50% { opacity: .95; } }
 
+/* refined attention flash when a NEW spam account is found */
+.pill.flash { animation: xflash 1s ease-out 2; }
+@keyframes xflash {
+  0% { box-shadow: var(--shadow); transform: scale(1); }
+  18% { box-shadow: 0 0 0 4px rgba(239,68,68,.35), var(--shadow); transform: scale(1.06); }
+  60% { box-shadow: 0 0 0 0 rgba(239,68,68,0), var(--shadow); transform: scale(1); }
+  100% { box-shadow: var(--shadow); transform: scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card.open { animation: fade .18s ease-out; }
   @keyframes fade { from { opacity: 0; } }
   .xss-badge.fresh, .xss-badge.known { animation: fade .18s ease-out; }
   .xss-badge.analyzing::after, .xss-spin { animation: none; }
   .xss-badge.pending { animation: none; opacity: .7; }
+  .pill.flash { animation: none; }
 }
 `;
 
@@ -323,10 +333,18 @@ export function createBubble(h: BubbleHandlers) {
   return {
     el: root,
     update(f: Finding[]) {
+      const grew = f.length > findings.length;
       findings = f;
       root.style.display = "";
       renderPill();
       if (open) renderCard();
+      if (grew) {
+        // refined double flash on a newly-found spam account
+        pill.classList.remove("flash");
+        void pill.offsetWidth; // restart the animation
+        pill.classList.add("flash");
+        setTimeout(() => pill.classList.remove("flash"), 2100);
+      }
     },
     setScanning(n: number) {
       scanning = Math.max(0, n);
