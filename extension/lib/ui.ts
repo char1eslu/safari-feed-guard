@@ -25,6 +25,7 @@ export const STYLE = `
   position: fixed; right: 16px; top: 16px; z-index: 2147483000;
   color: var(--text); -webkit-font-smoothing: antialiased;
 }
+.xss-bubble.br { top: auto; bottom: 16px; }
 .pill, .card {
   background: var(--surface); border: 1px solid var(--border);
   box-shadow: var(--shadow); backdrop-filter: blur(12px);
@@ -174,9 +175,9 @@ export interface BubbleHandlers {
 }
 
 /** Collapsed pill ⇄ expanded card. Default resting state = pill. */
-export function createBubble(h: BubbleHandlers) {
+export function createBubble(h: BubbleHandlers, pos: "tr" | "br" = "tr") {
   const root = document.createElement("div");
-  root.className = "xss xss-bubble";
+  root.className = `xss xss-bubble${pos === "br" ? " br" : ""}`;
   root.setAttribute("role", "status");
   root.setAttribute("aria-live", "polite");
 

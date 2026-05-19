@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { clearAllLocal, getGhLogin } from "../../lib/auth";
+import { type Settings, getSettings, setSetting } from "../../lib/settings";
 import {
   type BlockRecord,
   type CacheRow,
@@ -228,12 +229,45 @@ function Cache() {
   );
 }
 
+function Toggle({
+  on,
+  onChange,
+  label,
+  hint,
+}: { on: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 py-2">
+      <button
+        type="button"
+        onClick={() => onChange(!on)}
+        className={`mt-0.5 h-5 w-9 flex-none rounded-full transition ${on ? "bg-[#0ea5e9]" : "bg-white/15"}`}
+      >
+        <span
+          className={`block h-4 w-4 rounded-full bg-white transition ${on ? "translate-x-4" : "translate-x-0.5"}`}
+        />
+      </button>
+      <span>
+        <span className="font-medium">{label}</span>
+        {hint && <span className="block text-xs text-[#8b949e]">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
 function Settings() {
   const [login, setLogin] = useState("");
   const [flow, setFlow] = useState("");
   const [cleared, setCleared] = useState(false);
+  const [st, setSt] = useState<Settings | null>(null);
   const refresh = () => getGhLogin().then(setLogin);
-  useEffect(() => void refresh(), []);
+  useEffect(() => {
+    refresh();
+    getSettings().then(setSt);
+  }, []);
+  const save = async <K extends keyof Settings>(k: K, v: Settings[K]) => {
+    await setSetting(k, v);
+    setSt((p) => (p ? { ...p, [k]: v } : p));
+  };
   async function ghLogin() {
     setFlow("正在获取设备码…");
     const s = await bg<{ user_code: string; verification_uri: string; device_code: string; interval: number }>(
@@ -289,6 +323,55 @@ function Settings() {
           )}
         </p>
         {flow && <p className="text-[#f59e0b]">{flow}</p>}
+
+        {st && (
+          <div className="pt-6">
+            <p>
+              <b>检测行为</b> — 改动在下次刷新页面后生效。
+            </p>
+            <Toggle
+              on={st.enabled}
+              onChange={(v) => save("enabled", v)}
+              label="启用被动检测"
+              hint="关闭后扩展在 X 上完全不工作"
+            />
+            <Toggle
+              on={st.bubble}
+              onChange={(v) => save("bubble", v)}
+              label="显示角标气泡"
+            />
+            <Toggle
+              on={st.bubblePos === "tr"}
+              onChange={(v) => save("bubblePos", v ? "tr" : "br")}
+              label="气泡位置：右上角"
+              hint="关 = 右下角"
+            />
+            <Toggle
+              on={st.replyAuto}
+              onChange={(v) => save("replyAuto", v)}
+              label="回复区逐个自动检查"
+              hint="关闭可显著降低 LLM 调用 / 更克制"
+            />
+            <div className="pt-3 text-xs text-[#8b949e]">
+              高级：服务端地址（留空=默认线上）
+              <div className="mt-1 flex gap-2">
+                <input
+                  value={st.edgeBase}
+                  onChange={(e) => setSt({ ...st, edgeBase: e.target.value })}
+                  placeholder="https://…workers.dev"
+                  className="w-[340px] rounded-lg border border-white/[0.12] bg-white/5 px-2.5 py-1.5 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => save("edgeBase", st.edgeBase.trim())}
+                  className="cursor-pointer rounded-md border border-white/[0.12] bg-white/[0.06] px-2.5 py-1 text-xs hover:bg-white/[0.12]"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="pt-6">
           <p>

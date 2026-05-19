@@ -1,4 +1,5 @@
 import { isBlockedSync, warm as warmBlocklist, addBlocked } from "../lib/blocklist";
+import { onSettingsChange, getSettings } from "../lib/settings";
 import { addBlockRecord, bumpStats } from "../lib/store";
 import { type Cached, cacheGet, cacheSet, signalsHash } from "../lib/cache";
 import {
@@ -208,6 +209,12 @@ export default defineContentScript({
       tokens = Math.min(TOK_CAP, tokens + 1);
     }, 3000);
     const takeToken = () => (tokens > 0 ? (tokens--, true) : false);
+
+    let settings = await getSettings();
+    if (!settings.enabled) return; // master off → don't init (applies next load)
+    onSettingsChange((s) => {
+      settings = s;
+    });
 
     await warmBlocklist();
     const isReplyContext = () => /^\/[^/]+\/status\/\d+/.test(location.pathname);
@@ -438,7 +445,8 @@ export default defineContentScript({
       //        heuristic-positive). In-flight + budget guard cost.
       if (inflight.has(key)) return;
       const h = heuristic(sig);
-      const wantAuto = h.score >= AUTO_THRESHOLD || isReplyContext();
+      const wantAuto =
+        h.score >= AUTO_THRESHOLD || (settings.replyAuto && isReplyContext());
       if (!wantAuto) {
         badgeFor(anchor, key, sig, null); // clean-looking → manual check
         return;
@@ -535,8 +543,9 @@ export default defineContentScript({
           onDismiss() {
             dismissed = true;
           },
-        });
+        }, settings.bubblePos);
         container.appendChild(bubble.el);
+        if (!settings.bubble) bubble.el.style.display = "none";
         bubbleApi = bubble;
         return bubble;
       },

@@ -1,17 +1,13 @@
 // The only place that talks to the service / GitHub, so page CSP/CORS never
 // blocks us. Edge Worker /v1 API + GitHub Device-Flow login + admin proxy.
 import { GH_CLIENT_ID, getGhToken, setGh } from "../lib/auth";
+import { getSettings } from "../lib/settings";
 import type { BgRequest, BgResponse, CurationRecord } from "../lib/types";
 
 const DEFAULT_BASE = "https://x-spam-sentinel-edge.zuoluotv.workers.dev";
 
 async function base(): Promise<string> {
-  try {
-    const g = await chrome.storage.local.get("xss:edgeBase");
-    return (g["xss:edgeBase"] as string) || DEFAULT_BASE;
-  } catch {
-    return DEFAULT_BASE;
-  }
+  return (await getSettings()).edgeBase || DEFAULT_BASE;
 }
 
 async function call(path: string, init?: RequestInit): Promise<Record<string, unknown>> {
