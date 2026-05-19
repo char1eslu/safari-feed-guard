@@ -1,0 +1,26 @@
+name = "x-spam-sentinel-edge"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+# Personal account (meleilei@gmail.com) — chosen explicitly by the owner;
+# pinned because the auth has multiple accounts.
+account_id = "cfab318ffd80d3f933cb6742534e88f3"
+
+# D1 — curation source of truth. Create with:
+#   npx wrangler d1 create xss-db
+# then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "xss-db"
+database_id = "c3a73f50-9af1-4b85-9b5b-db19dd33f175"
+
+[vars]
+LLM_BASE_URL = "https://api.ttttt.ai/v1"
+LLM_MODEL = "gpt-5.5"
+# LLM_API_KEY is a secret, NOT a var:
+#   npx wrangler secret put LLM_API_KEY
+
+# R2 (published bloom/JSON artifact) — phase 2, uncomment when wiring publish:
+# [[r2_buckets]]
+# binding = "ARTIFACTS"
+# bucket_name = "xss-blocklist"

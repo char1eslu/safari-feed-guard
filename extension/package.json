@@ -1,0 +1,22 @@
+{
+  "name": "x-spam-sentinel-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "x-spam-sentinel browser extension (WXT, MV3, passive).",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "compile": "tsc --noEmit",
+    "postinstall": "wxt prepare"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "typescript": "^5.7.2",
+    "wxt": "^0.20.6"
+  }
+}

@@ -1,0 +1,36 @@
+name: "⚖️ 申诉：账号被误列 (False-positive appeal)"
+description: A legitimate account was listed as spam. Request review & removal.
+title: "[Appeal] @<handle> wrongly listed"
+labels: ["appeal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        误判申诉是第一优先级。我们会人工复核；成立则该条目在下一版公开名单中
+        被可审计地移除。范围争议（观点/语言等）也走这里——这类账号本就不该被列。
+  - type: input
+    id: handle
+    attributes:
+      label: 账号 @handle
+      placeholder: "@example"
+    validations:
+      required: true
+  - type: input
+    id: userid
+    attributes:
+      label: X 数字 user id（若知道）
+      description: 可在头像图片 URL 中找到 (pbs.twimg.com/profile_images/<id>/...)
+  - type: textarea
+    id: why
+    attributes:
+      label: 为什么这是误判
+      description: 请说明该账号为何不属于 spam / 色情广告 bot 范围
+    validations:
+      required: true
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: 确认
+      options:
+        - label: 我已阅读 GOVERNANCE.md，理解范围仅限 spam/色情广告 bot
+          required: true

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 安全 / 隐私问题
+    url: https://github.com/onenorthlab/x-spam-sentinel/blob/main/SECURITY.md
+    about: 请勿公开提交，按 SECURITY.md 私下联系维护者。
+  - name: 📐 机制与治理
+    url: https://github.com/onenorthlab/x-spam-sentinel/blob/main/docs/ARCHITECTURE.md
+    about: 设计/治理讨论请先读架构与 GOVERNANCE.md。

@@ -1,0 +1,17 @@
+{
+  "userId": "44196397",
+  "handle": "jane_builds",
+  "displayName": "Jane — infra engineer",
+  "bio": "SRE. I write about Kubernetes, Postgres and on-call sanity. Opinions mine.",
+  "accountAgeDays": 2410,
+  "followersCount": 5300,
+  "followingCount": 410,
+  "triggeringComment": "Disagree — connection pooling won't fix a slow query, profile it first.",
+  "recentTweets": [
+    "Postmortem write-up from last week's incident is up on the blog.",
+    "Reminder: pgbouncer in transaction mode breaks session-level features.",
+    "Conference talk accepted, see you in Berlin.",
+    "Hot take: most 'observability' spend is unused dashboards.",
+    "Mentoring two juniors this quarter, really enjoying it."
+  ]
+}

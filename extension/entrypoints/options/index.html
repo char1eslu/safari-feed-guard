@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>x-spam-sentinel · 管理面板</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <aside>
+      <div class="brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9"
+          stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+        <b>x-spam-sentinel</b>
+      </div>
+      <nav id="nav">
+        <button data-tab="overview" class="active">概览</button>
+        <button data-tab="blocklist">拉黑记录</button>
+        <button data-tab="cache">检测缓存</button>
+        <button data-tab="about">关于</button>
+      </nav>
+      <div class="ver" id="ver"></div>
+    </aside>
+    <main id="main"></main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
