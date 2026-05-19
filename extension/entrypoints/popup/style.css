@@ -1,39 +1,4 @@
+@import "tailwindcss";
+
 :root { color-scheme: dark; }
-* { box-sizing: border-box; }
-body {
-  width: 340px; margin: 0; padding: 14px;
-  font: 13px system-ui, -apple-system, "Segoe UI", sans-serif;
-  background: #0d1117; color: #e6edf3;
-}
-header { display: flex; align-items: center; gap: 8px; }
-header b { font-size: 14px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #8b949e; margin-left: auto; }
-.dot.ok { background: #22c55e; }
-.dot.bad { background: #ef4444; }
-.status {
-  margin: 10px 0; padding: 8px 10px; border-radius: 8px;
-  background: rgba(255,255,255,.05); color: #8b949e; font-size: 12px;
-}
-.status.ok { color: #e6edf3; }
-.status.bad { color: #fca5a5; }
-.list { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow: auto; }
-.list li {
-  display: flex; align-items: center; gap: 8px; padding: 7px 4px;
-  border-bottom: 1px solid rgba(255,255,255,.06);
-}
-.list .h { font-weight: 600; }
-.tag {
-  margin-left: auto; font-size: 11px; font-weight: 700; padding: 2px 8px;
-  border-radius: 999px; border: 1px solid currentColor;
-}
-.t-danger { color: #ef4444; }
-.t-warn { color: #f59e0b; }
-.t-neutral { color: #8b949e; }
-.t-safe { color: #22c55e; }
-footer {
-  display: flex; flex-direction: column; gap: 4px; margin-top: 12px;
-  font-size: 11px;
-}
-footer a { color: #0ea5e9; text-decoration: none; }
-footer a:hover { text-decoration: underline; }
-.muted { color: #8b949e; }
+html, body { width: 340px; margin: 0; }

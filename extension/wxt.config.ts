@@ -1,9 +1,12 @@
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "wxt";
 
 // x-spam-sentinel — strictly passive. Only localhost host permission; no
 // X host permissions beyond the content-script match (we only read the DOM
 // already rendered for the user).
 export default defineConfig({
+  modules: ["@wxt-dev/module-react"],
+  vite: () => ({ plugins: [tailwindcss()] }),
   // Don't spawn a throwaway browser profile on `wxt dev`. Load the built
   // .output/chrome-mv3 into your own Chrome (logged into X) manually; WXT
   // still watches + hot-reloads it.

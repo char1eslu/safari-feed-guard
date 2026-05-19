@@ -6,22 +6,8 @@
     <title>x-spam-sentinel</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
-  <body>
-    <header>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9"
-        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
-      <b>x-spam-sentinel</b>
-      <span id="dot" class="dot"></span>
-    </header>
-    <p id="status" class="status">检查服务…</p>
-    <button id="panel" style="width:100%;margin:0 0 10px;padding:9px;border:0;border-radius:8px;background:#0ea5e9;color:#fff;font-weight:600;font-size:13px;cursor:pointer">打开管理面板</button>
-    <ul id="list" class="list"></ul>
-    <footer>
-      <a href="https://github.com/onenorthlab/x-spam-sentinel/blob/main/GOVERNANCE.md"
-        target="_blank" rel="noopener">为什么 / 治理</a>
-      <span class="muted">名单均为 auto_pending_review，永不自动公开</span>
-    </footer>
-    <script type="module" src="./main.ts"></script>
+  <body class="bg-[#0d1117] text-[#e6edf3]">
+    <div id="app"></div>
+    <script type="module" src="./main.tsx"></script>
   </body>
 </html>
