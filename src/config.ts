@@ -20,21 +20,33 @@ function loadDotEnv(path = ".env"): void {
   }
 }
 
-loadDotEnv();
-
 const Env = z.object({
   LLM_BASE_URL: z.string().url(),
   LLM_API_KEY: z.string().min(1),
   LLM_MODEL: z.string().min(1),
 });
 
-const parsed = Env.safeParse(process.env);
-if (!parsed.success) {
-  console.error(
-    "Missing LLM config. Copy .env.example to .env and fill it in.\n",
-    parsed.error.flatten().fieldErrors,
-  );
-  process.exit(1);
+type EnvShape = z.infer<typeof Env>;
+
+let cached: EnvShape | null = null;
+function load(): EnvShape {
+  if (cached) return cached;
+  loadDotEnv();
+  const parsed = Env.safeParse(process.env);
+  if (!parsed.success) {
+    const fields = Object.keys(parsed.error.flatten().fieldErrors).join(", ") || "all";
+    throw new Error(`Missing LLM config (${fields}). Copy .env.example to .env and fill it in.`);
+  }
+  cached = parsed.data;
+  return cached;
 }
 
-export const config = parsed.data;
+// Lazy proxy — module import is side-effect-free, so unit tests that touch
+// pure helpers (signalsHash, etc.) don't blow up under `node --test` in CI
+// where no .env exists. The check still fires the first time any
+// `config.LLM_*` is read at runtime (LLM call sites).
+export const config: EnvShape = new Proxy({} as EnvShape, {
+  get(_t, k) {
+    return load()[k as keyof EnvShape];
+  },
+});

@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   console.log(bar);
   console.log(`label       : ${v.label}`);
   console.log(`confidence  : ${v.confidence.toFixed(2)}`);
-  console.log(`reasons     :`);
+  console.log("reasons     :");
   for (const r of v.reasons) console.log(`  • ${r}`);
   console.log(`review      : ${record.reviewStatus}  (never auto-public)`);
   console.log(`source      : ${cached ? "cache" : `LLM ${record.model}`}`);

@@ -93,14 +93,25 @@ function hash(s: string): string {
   return h.toString(36);
 }
 const sigHash = (s: Signals) =>
-  hash(JSON.stringify([s.handle, s.displayName, s.bio, s.recentTweets, s.hasDefaultAvatar ?? 0, s.accountAgeDays ?? -1]));
+  hash(
+    JSON.stringify([
+      s.handle,
+      s.displayName,
+      s.bio,
+      s.recentTweets,
+      s.hasDefaultAvatar ?? 0,
+      s.accountAgeDays ?? -1,
+    ]),
+  );
 
 function userPrompt(s: Signals): string {
   const meta = [
     s.accountAgeDays !== undefined ? `accountAgeDays=${s.accountAgeDays}` : "",
     s.followersCount !== undefined ? `followers=${s.followersCount}` : "",
     s.hasDefaultAvatar !== undefined ? `hasDefaultAvatar=${s.hasDefaultAvatar}` : "",
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
   return `handle: @${s.handle}
 displayName: ${s.displayName || "(empty)"}
 bio: ${s.bio || "(empty)"}
@@ -144,15 +155,22 @@ app.get("/v1/health", async (c) => {
 
 // Public membership check — only human_confirmed (the public list).
 app.get("/v1/check", async (c) => {
-  const ids = (c.req.query("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 100);
+  const ids = (c.req.query("ids") ?? "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 100);
   if (!ids.length) return c.json({ hits: {} });
   const ph = ids.map(() => "?").join(",");
   const rows = await c.env.DB.prepare(
     `SELECT x_user_id, verdict_label, confidence FROM accounts
      WHERE status='human_confirmed' AND x_user_id IN (${ph})`,
-  ).bind(...ids).all<{ x_user_id: string; verdict_label: string; confidence: number }>();
+  )
+    .bind(...ids)
+    .all<{ x_user_id: string; verdict_label: string; confidence: number }>();
   const hits: Record<string, { label: string; confidence: number }> = {};
-  for (const r of rows.results ?? []) hits[r.x_user_id] = { label: r.verdict_label, confidence: r.confidence };
+  for (const r of rows.results ?? [])
+    hits[r.x_user_id] = { label: r.verdict_label, confidence: r.confidence };
   return c.json({ hits });
 });
 
@@ -165,13 +183,27 @@ app.post("/v1/classify", async (c) => {
   const uid = s.userId ?? null;
   const prev = await c.env.DB.prepare(
     "SELECT verdict_label, confidence, reasons, model, signals_hash, status FROM accounts WHERE (x_user_id IS ? OR x_user_id=?) AND handle=?",
-  ).bind(uid, uid, s.handle).first<{
-    verdict_label: string; confidence: number; reasons: string; model: string; signals_hash: string; status: string;
-  }>();
+  )
+    .bind(uid, uid, s.handle)
+    .first<{
+      verdict_label: string;
+      confidence: number;
+      reasons: string;
+      model: string;
+      signals_hash: string;
+      status: string;
+    }>();
   if (prev && prev.signals_hash === h) {
     return c.json({
       cached: true,
-      record: { verdict: { label: prev.verdict_label, confidence: prev.confidence, reasons: JSON.parse(prev.reasons || "[]") }, status: prev.status },
+      record: {
+        verdict: {
+          label: prev.verdict_label,
+          confidence: prev.confidence,
+          reasons: JSON.parse(prev.reasons || "[]"),
+        },
+        status: prev.status,
+      },
     });
   }
   const verdict = await classify(c.env, s);
@@ -183,7 +215,21 @@ app.post("/v1/classify", async (c) => {
        verdict_label=excluded.verdict_label, confidence=excluded.confidence, reasons=excluded.reasons,
        model=excluded.model, signals_hash=excluded.signals_hash, last_scored=excluded.last_scored,
        avatar_url=COALESCE(excluded.avatar_url, accounts.avatar_url)`,
-  ).bind(uid, s.handle, s.displayName, s.avatarUrl ?? null, verdict.label, verdict.confidence, JSON.stringify(verdict.reasons), c.env.LLM_MODEL, h, now, now).run();
+  )
+    .bind(
+      uid,
+      s.handle,
+      s.displayName,
+      s.avatarUrl ?? null,
+      verdict.label,
+      verdict.confidence,
+      JSON.stringify(verdict.reasons),
+      c.env.LLM_MODEL,
+      h,
+      now,
+      now,
+    )
+    .run();
   return c.json({ cached: false, record: { verdict, status: "auto_pending_review" } });
 });
 
@@ -243,15 +289,33 @@ async function submitReport(c: Ctx, source: string) {
        avatar_url=COALESCE(excluded.avatar_url, accounts.avatar_url)`,
   )
     .bind(
-      uid, s.handle, s.displayName, s.avatarUrl ?? null, vLabel, vConf,
-      '["reported"]', status, source, now, now, auto ? now : null,
-      status, auto ? now : null,
+      uid,
+      s.handle,
+      s.displayName,
+      s.avatarUrl ?? null,
+      vLabel,
+      vConf,
+      '["reported"]',
+      status,
+      source,
+      now,
+      now,
+      auto ? now : null,
+      status,
+      auto ? now : null,
     )
     .run();
   await c.env.DB.prepare(
     "INSERT INTO review_log (x_user_id,handle,action,actor,note,at) VALUES (?,?,?,?,?,?)",
   )
-    .bind(uid, s.handle, auto ? "auto_confirm" : "report_queued", who, `${source} r=${reporters}`, now)
+    .bind(
+      uid,
+      s.handle,
+      auto ? "auto_confirm" : "report_queued",
+      who,
+      `${source} r=${reporters}`,
+      now,
+    )
     .run();
   return c.json({ ok: true, status, reporters, auto });
 }
@@ -321,9 +385,78 @@ app.get("/v1/admin/log", async (c) => {
 
 app.get("/v1/list/meta", async (c) => {
   const r = await c.env.DB.prepare(
-    "SELECT count(*) n, max(published_at) latest FROM accounts WHERE status='human_confirmed'",
-  ).first<{ n: number; latest: number }>();
-  return c.json({ count: r?.n ?? 0, generatedAt: r?.latest ?? null, version: `d1-${r?.n ?? 0}` });
+    `SELECT count(*) n,
+            max(published_at) latest,
+            sum(CASE WHEN published_at >= ? THEN 1 ELSE 0 END) AS week,
+            (SELECT count(*) FROM accounts WHERE status='auto_pending_review') AS pending
+       FROM accounts WHERE status='human_confirmed'`,
+  )
+    .bind(Date.now() - 7 * 24 * 3600_000)
+    .first<{ n: number; latest: number | null; week: number; pending: number }>();
+  c.header("Cache-Control", "public, max-age=30, s-maxage=60");
+  return c.json({
+    count: r?.n ?? 0,
+    week: r?.week ?? 0,
+    pending: r?.pending ?? 0,
+    generatedAt: r?.latest ?? null,
+    version: `d1-${r?.n ?? 0}`,
+  });
+});
+
+// Public paginated spam list — backs the /list page and any external mirror.
+// Returns only human_confirmed (the published set). Keyset-paginates on
+// published_at (DESC) — O(limit), no OFFSET. Edge-cached so polling clients
+// don't hammer D1; weak ETag lets the page short-circuit when nothing changed.
+//
+//   GET /v1/list?limit=100               → latest 100
+//   GET /v1/list?limit=100&before=<ms>   → 100 strictly older than <ms>
+//   GET /v1/list?limit=100&since=<ms>    → up to 100 strictly newer than <ms> (poll)
+//
+// reporters = count of distinct GitHub reporters per target, joined from
+// `reports`. At the data sizes we expect this WITH ... LEFT JOIN is fine;
+// if it ever gets hot, denormalize a column.
+app.get("/v1/list", async (c) => {
+  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit")) || 100));
+  const before = Number(c.req.query("before")) || null;
+  const since = Number(c.req.query("since")) || null;
+  const rows = await c.env.DB.prepare(
+    `WITH rep AS (
+       SELECT handle, x_user_id, count(DISTINCT reporter_fp) AS n
+         FROM reports WHERE reporter_fp IS NOT NULL
+        GROUP BY handle, x_user_id
+     )
+     SELECT a.x_user_id, a.handle, a.display_name, a.avatar_url,
+            a.verdict_label, a.confidence, a.published_at,
+            coalesce(rep.n, 0) AS reporters
+       FROM accounts a
+       LEFT JOIN rep ON rep.handle = a.handle
+                    AND ifnull(rep.x_user_id,'') = ifnull(a.x_user_id,'')
+      WHERE a.status='human_confirmed'
+        AND a.published_at IS NOT NULL
+        AND (?1 IS NULL OR a.published_at < ?1)
+        AND (?2 IS NULL OR a.published_at > ?2)
+      ORDER BY a.published_at DESC
+      LIMIT ?3`,
+  )
+    .bind(before, since, limit)
+    .all<{
+      x_user_id: string | null;
+      handle: string;
+      display_name: string | null;
+      avatar_url: string | null;
+      verdict_label: string;
+      confidence: number;
+      published_at: number;
+      reporters: number;
+    }>();
+  const list = rows.results ?? [];
+  const nextBefore = list.length === limit ? list[list.length - 1].published_at : null;
+  const latestAt = list[0]?.published_at ?? null;
+  const etag = `W/"l${latestAt ?? 0}-n${list.length}-b${before ?? 0}-s${since ?? 0}"`;
+  c.header("Cache-Control", "public, max-age=10, s-maxage=30");
+  c.header("ETag", etag);
+  if (c.req.header("if-none-match") === etag) return c.body(null, 304);
+  return c.json({ list, nextBefore, latestAt });
 });
 
 // Standalone admin console (separate from the consumer extension). The
