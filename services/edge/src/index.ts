@@ -1,6 +1,8 @@
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
+import { landingHtml } from "./pages/landing";
+import { listHtml } from "./pages/list";
 
 interface Env {
   DB: D1Database;
@@ -457,6 +459,38 @@ app.get("/v1/list", async (c) => {
   c.header("ETag", etag);
   if (c.req.header("if-none-match") === etag) return c.body(null, 304);
   return c.json({ list, nextBefore, latestAt });
+});
+
+// CSP for the SSR HTML pages — strict by default, with X's avatar CDN +
+// unavatar.io allow-listed for the public board. Inline style/script are
+// required because we ship everything in one document; rotate to nonce if
+// these pages ever import 3rd-party deps.
+const PAGE_CSP =
+  "default-src 'self'; " +
+  "img-src 'self' data: https://pbs.twimg.com https://*.twimg.com https://unavatar.io; " +
+  "style-src 'self' 'unsafe-inline'; " +
+  "script-src 'self' 'unsafe-inline'; " +
+  "connect-src 'self'; " +
+  "frame-ancestors 'none'; " +
+  "base-uri 'none'";
+
+function pageHeaders(c: Ctx, cacheSeconds: number): void {
+  c.header("Content-Security-Policy", PAGE_CSP);
+  c.header("Referrer-Policy", "no-referrer");
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("Cache-Control", `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds * 2}`);
+}
+
+// Product landing — dark-glass marketing page, no PII, no external deps.
+app.get("/", (c) => {
+  pageHeaders(c, 60);
+  return c.html(landingHtml());
+});
+
+// Public spam board — latest 100 human_confirmed accounts (polls /v1/list).
+app.get("/list", (c) => {
+  pageHeaders(c, 30);
+  return c.html(listHtml());
 });
 
 // Standalone admin console (separate from the consumer extension). The
