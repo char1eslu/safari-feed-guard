@@ -61,8 +61,10 @@ const CSS = `
 
 @media (max-width:760px){
   .head h1{font-size:26px}
+  /* Hero (count) takes top, derived "日均" hidden, remaining 2 cards split a row */
   .aggr{grid-template-columns:1fr 1fr;gap:10px}
   .aggr .c.hero{grid-column:1/-1}
+  .aggr .c.daily{display:none}
 }
 @media (max-width:480px){
   .row{grid-template-columns:32px 1fr auto;gap:10px;padding:9px 12px 9px 14px}
@@ -87,7 +89,7 @@ const SHELL = `
 <div class="aggr">
   <div class="c hero"><div class="n" id="agCount">—</div><div class="l">已确认总数</div></div>
   <div class="c"><div class="n" id="agWeek">—</div><div class="l">本周新增</div></div>
-  <div class="c"><div class="n" id="agDaily">—</div><div class="l">日均</div></div>
+  <div class="c daily"><div class="n" id="agDaily">—</div><div class="l">日均</div></div>
   <div class="c"><div class="n" id="agLatest">—</div><div class="l">最近一条</div></div>
 </div>
 

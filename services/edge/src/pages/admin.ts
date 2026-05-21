@@ -159,7 +159,10 @@ const SCRIPT = String.raw`
   var VIEW='queue';
   var queue=[];
   var filter='all';
-  var sort='conf_desc';
+  // Default: risk-severity first (spam/porn_bot/likely_spam ahead of legit/uncertain),
+  // ties broken by AI confidence DESC — so maintainers see what actually needs
+  // moderating, not the 158 obvious legit accounts the model classified.
+  var sort='severity';
   var sel=new Set();           // selected (handle|x_user_id)
   var logCursor=null;
   var GH='${GH_REPO}';
@@ -217,7 +220,14 @@ const SCRIPT = String.raw`
   }
   function filteredQueue(){
     var rows=filter==='all'?queue.slice():queue.filter(function(a){return a.verdict_label===filter});
-    if(sort==='conf_desc')rows.sort(function(a,b){return (b.confidence||0)-(a.confidence||0)});
+    if(sort==='severity'){
+      var sev={spam:4,porn_bot:4,likely_spam:3,uncertain:1,legit:0};
+      rows.sort(function(a,b){
+        var sa=sev[a.verdict_label]||0,sb=sev[b.verdict_label]||0;
+        if(sa!==sb)return sb-sa;
+        return (b.confidence||0)-(a.confidence||0);
+      });
+    } else if(sort==='conf_desc')rows.sort(function(a,b){return (b.confidence||0)-(a.confidence||0)});
     else if(sort==='time_desc')rows.sort(function(a,b){return (b.last_scored||0)-(a.last_scored||0)});
     else if(sort==='rep_desc')rows.sort(function(a,b){return (b.reporters||0)-(a.reporters||0)});
     return rows;
@@ -243,6 +253,7 @@ const SCRIPT = String.raw`
         +'</div>'
         +'<div class="right"><label class="status">排序</label>'
           +'<select id="sort">'
+            +'<option value="severity"'+(sort==='severity'?' selected':'')+'>风险等级 ↓</option>'
             +'<option value="conf_desc"'+(sort==='conf_desc'?' selected':'')+'>AI 置信 ↓</option>'
             +'<option value="time_desc"'+(sort==='time_desc'?' selected':'')+'>时间 ↓</option>'
             +'<option value="rep_desc"'+(sort==='rep_desc'?' selected':'')+'>举报人数 ↓</option>'
