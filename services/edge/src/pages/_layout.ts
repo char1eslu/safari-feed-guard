@@ -7,35 +7,71 @@ const GH_REPO = "https://github.com/onenorthlab/x-spam-sentinel";
 const RELEASE_URL = `${GH_REPO}/releases/latest`;
 
 /** Dark-glass design tokens + reusable utility classes; bytes are cheap. */
-const CSS = `:root{color-scheme:dark}
+const CSS = `:root{
+  color-scheme:dark;
+  --bg:#0a0a0a; --fg:#e6edf3; --fg-2:#a3a8b3; --fg-3:#8b949e; --fg-4:#6b7280;
+  --border:rgba(255,255,255,.08); --border-2:rgba(255,255,255,.14);
+  --card:rgba(255,255,255,.035); --card-hi:rgba(255,255,255,.06);
+  --accent:#38bdf8; --accent-soft:rgba(56,189,248,.14);
+  --danger:#ef4444; --warn:#f59e0b; --ok:#10b981; --violet:#a855f7;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{background:#0a0a0a;color:#e6edf3;font:15px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+html,body{background:var(--bg);color:var(--fg);font:15px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 body{min-height:100vh;background:
-  radial-gradient(1200px 600px at 20% -10%,rgba(56,189,248,.07),transparent 60%),
-  radial-gradient(800px 500px at 100% 10%,rgba(168,85,247,.05),transparent 55%),
-  #0a0a0a}
+  radial-gradient(1200px 600px at 20% -10%,rgba(56,189,248,.08),transparent 60%),
+  radial-gradient(900px 540px at 100% 10%,rgba(168,85,247,.055),transparent 55%),
+  var(--bg)}
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+
+/* Keyboard focus — visible on all interactive surfaces */
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.btn:focus-visible,.tag:focus-visible{outline-offset:3px}
+
 .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
-.nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+
+/* Top nav */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0;border-bottom:1px solid var(--border)}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.2px}
-.brand svg{width:24px;height:24px}
-.nav .links{display:flex;gap:22px;font-size:13px;color:#a3a8b3}
-.nav .links a{transition:color .15s ease}
-.nav .links a:hover,.nav .links a.on{color:#e6edf3}
-.muted{color:#8b949e}
-.tiny{font-size:12px;color:#8b949e}
-.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border-radius:10px;font-size:14px;font-weight:500;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);backdrop-filter:blur(8px);transition:background .15s,border-color .15s,transform .15s}
-.btn:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}
-.btn.primary{background:#e6edf3;color:#0a0a0a;border-color:transparent}
-.btn.primary:hover{background:#fff}
+.brand svg{width:24px;height:24px;color:var(--accent)}
+.nav .links{display:flex;gap:6px;font-size:13px;color:var(--fg-2)}
+.nav .links a{padding:6px 12px;border-radius:8px;transition:color .15s,background .15s}
+.nav .links a:hover{color:var(--fg);background:rgba(255,255,255,.04)}
+.nav .links a.on{color:var(--fg);background:var(--accent-soft);box-shadow:inset 0 -1px 0 var(--accent)}
+
+.muted{color:var(--fg-3)}
+.tiny{font-size:12px;color:var(--fg-3)}
+
+/* Button — three tiers: primary (light), default (glass), danger (red ghost) */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 16px;border-radius:10px;font-size:14px;font-weight:500;line-height:1;border:1px solid var(--border-2);background:var(--card);backdrop-filter:blur(8px);transition:background .15s,border-color .15s,transform .12s,box-shadow .15s;white-space:nowrap}
+.btn:hover{background:var(--card-hi);border-color:rgba(255,255,255,.22)}
+.btn:active{transform:translateY(1px)}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn.primary{background:#fafafa;color:#0a0a0a;border-color:transparent;box-shadow:0 0 0 1px rgba(56,189,248,.5),0 6px 18px -8px rgba(56,189,248,.45)}
+.btn.primary:hover{background:#fff;box-shadow:0 0 0 1px rgba(56,189,248,.65),0 8px 24px -8px rgba(56,189,248,.55)}
+.btn.danger{color:#fca5a5;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.06)}
+.btn.danger:hover{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.55);color:#fecaca}
+.btn.sm{padding:6px 10px;font-size:12.5px;border-radius:8px}
 .btn svg{width:15px;height:15px;flex-shrink:0}
-.card{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);border-radius:14px;backdrop-filter:blur(10px)}
-.tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid currentColor;line-height:1.2}
-.tag.spam{color:#ef4444}.tag.porn_bot{color:#a855f7}.tag.likely_spam{color:#f59e0b}.tag.uncertain{color:#8b949e}.tag.legit{color:#10b981}
-.foot{margin-top:80px;padding:32px 0 48px;border-top:1px solid rgba(255,255,255,.06);font-size:13px;color:#8b949e;display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
-.foot a:hover{color:#e6edf3}
-@media (max-width:640px){.wrap{padding:0 16px}.nav .links{gap:14px;font-size:12px}}
+
+/* Card */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;backdrop-filter:blur(10px)}
+
+/* Verdict tag — color tied to severity */
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid currentColor;line-height:1.2;letter-spacing:.02em}
+.tag.spam{color:var(--danger)}
+.tag.porn_bot{color:var(--violet)}
+.tag.likely_spam{color:var(--warn)}
+.tag.uncertain{color:var(--fg-3)}
+.tag.legit{color:var(--ok)}
+
+/* Footer */
+.foot{margin-top:80px;padding:32px 0 48px;border-top:1px solid var(--border);font-size:13px;color:var(--fg-3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
+.foot a:hover{color:var(--fg)}
+.foot .sep{color:var(--fg-4);margin:0 6px}
+
+@media (max-width:640px){.wrap{padding:0 16px}.nav .links{gap:2px;font-size:12px}.nav .links a{padding:5px 9px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
 `;
 
@@ -87,11 +123,11 @@ ${o.head ?? ""}
 ${o.body}
 </main>
 <footer class="wrap foot" role="contentinfo">
-  <span>© 2026 OneNorth Lab · AGPL-3.0</span>
+  <span>© 2026 OneNorth Lab<span class="sep">·</span>AGPL-3.0</span>
   <span>
-    <a href="${GH_REPO}">仓库</a> ·
-    <a href="${GH_REPO}/blob/main/docs/GOVERNANCE.md">治理</a> ·
-    <a href="${GH_REPO}/blob/main/docs/PRIVACY.md">隐私</a> ·
+    <a href="${GH_REPO}">仓库</a><span class="sep">·</span>
+    <a href="${GH_REPO}/blob/main/docs/GOVERNANCE.md">治理</a><span class="sep">·</span>
+    <a href="${GH_REPO}/blob/main/docs/PRIVACY.md">隐私</a><span class="sep">·</span>
     <a href="${GH_REPO}/issues">反馈</a>
   </span>
 </footer>
