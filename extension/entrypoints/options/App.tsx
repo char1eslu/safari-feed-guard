@@ -12,6 +12,7 @@ import {
 import type { BgResponse, Label } from "../../lib/types";
 
 const REPO = "https://github.com/onenorthlab/x-spam-sentinel";
+const EDGE_DEFAULT = "https://x-spam-sentinel-edge.zuoluotv.workers.dev";
 
 function bg<T = Record<string, unknown>>(msg: unknown): Promise<BgResponse & { data?: T }> {
   return new Promise((r) => chrome.runtime.sendMessage(msg, (x) => r(x ?? { ok: false })));
@@ -21,21 +22,28 @@ const idTail = (id: string, h: string) =>
   /^\d+$/.test(id) && id !== h && !/^\d+$/.test(h) ? ` · ${id}` : "";
 
 const TAG: Record<Label, [string, string]> = {
-  spam: ["text-[#ef4444]", "垃圾"],
-  porn_bot: ["text-[#ef4444]", "色情bot"],
-  likely_spam: ["text-[#f59e0b]", "疑似垃圾"],
-  uncertain: ["text-[#8b949e]", "不确定"],
-  legit: ["text-[#22c55e]", "正常"],
+  spam: ["text-danger", "垃圾"],
+  porn_bot: ["text-violet", "色情bot"],
+  likely_spam: ["text-warn", "疑似垃圾"],
+  uncertain: ["text-fg-3", "不确定"],
+  legit: ["text-ok", "正常"],
 };
 const Tag = ({ label, conf }: { label: Label; conf?: number }) => {
-  const [cls, zh] = TAG[label] ?? ["text-[#8b949e]", label];
+  const [cls, zh] = TAG[label] ?? ["text-fg-3", label];
   return (
-    <span className={`rounded-full border border-current px-2 py-0.5 text-[11px] font-bold ${cls}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border border-current px-2 py-0.5 text-[11px] font-semibold tracking-[0.02em] ${cls}`}
+    >
       {zh}
-      {conf !== undefined ? ` ${(conf * 100).toFixed(0)}%` : ""}
+      {conf !== undefined ? (
+        <span className="font-mono text-[10.5px] opacity-80">
+          {(conf * 100).toFixed(0)}%
+        </span>
+      ) : null}
     </span>
   );
 };
+
 const Avatar = ({ url, name }: { url?: string; name?: string }) => {
   const mono = (name || "?").replace(/^@/, "").charAt(0).toUpperCase();
   return url ? (
@@ -46,20 +54,65 @@ const Avatar = ({ url, name }: { url?: string; name?: string }) => {
       className="h-7 w-7 flex-none rounded-full bg-[#21262d] object-cover"
     />
   ) : (
-    <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#21262d] text-xs font-bold text-[#8b949e]">
+    <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#21262d] text-xs font-bold text-fg-3">
       {mono}
     </span>
   );
 };
-const Page = ({ title, sub, children }: { title: string; sub?: string; children?: React.ReactNode }) => (
+
+type BtnTier = "primary" | "default" | "ghost" | "danger";
+function Btn({
+  tier = "default",
+  size = "md",
+  className = "",
+  children,
+  ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  tier?: BtnTier;
+  size?: "sm" | "md";
+}) {
+  const tone =
+    tier === "primary"
+      ? "bg-fg text-bg border-transparent hover:bg-white shadow-[0_0_0_1px_rgba(56,189,248,0.5),0_4px_14px_-8px_rgba(56,189,248,0.4)]"
+      : tier === "danger"
+        ? "border-danger/35 bg-danger-soft text-[#fca5a5] hover:bg-danger/20 hover:border-danger/55"
+        : tier === "ghost"
+          ? "border-transparent bg-transparent text-fg-2 hover:bg-card hover:text-fg"
+          : "border-border-2 bg-card text-fg hover:bg-card-hi hover:border-[rgb(255_255_255/0.22)]";
+  const px = size === "sm" ? "px-2.5 py-1 text-[12px]" : "px-3 py-1.5 text-[13px]";
+  return (
+    <button
+      type="button"
+      {...rest}
+      className={`inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border font-medium leading-none transition-[background,border-color,transform,color] active:translate-y-px ${px} ${tone} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+const Page = ({
+  title,
+  sub,
+  children,
+}: { title: string; sub?: string; children?: React.ReactNode }) => (
   <main className="max-w-[1100px] flex-1 px-8 py-7">
-    <h1 className="text-xl font-bold">{title}</h1>
-    {sub && <div className="mb-5 mt-1 text-[13px] text-[#8b949e]">{sub}</div>}
+    <h1 className="text-[22px] font-bold tracking-[-0.01em]">{title}</h1>
+    {sub && <div className="mb-6 mt-1 text-[13px] text-fg-3">{sub}</div>}
     {children}
   </main>
 );
-const td = "border-b border-white/[0.06] px-2.5 py-2 align-middle whitespace-nowrap";
-const th = `${td} text-xs font-semibold text-[#8b949e]`;
+
+const SectionH = ({ children }: { children: React.ReactNode }) => (
+  <h2 className="mb-3 mt-1 flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.2em] text-fg-3">
+    <span>{children}</span>
+    <span aria-hidden className="h-px flex-1 bg-border" />
+  </h2>
+);
+
+const td = "border-b border-border px-3 py-2.5 align-middle whitespace-nowrap";
+const th = `${td} text-[11px] font-semibold uppercase tracking-[0.05em] text-fg-3`;
+const trHover = "transition hover:bg-card";
 
 function Overview() {
   const [s, setS] = useState<Awaited<ReturnType<typeof getStats>> | null>(null);
@@ -72,34 +125,71 @@ function Overview() {
   const d = s.byLabel;
   const total = Object.values(d).reduce((a, b) => a + b, 0) || 1;
   const seg = (k: string, c: string) =>
-    d[k] ? <i style={{ width: `${((d[k] / total) * 100).toFixed(1)}%`, background: c }} className="block h-full" /> : null;
-  const Card = ({ n, l }: { n: number; l: string }) => (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-4">
-      <div className="text-2xl font-bold">{n}</div>
-      <div className="mt-1 text-xs text-[#8b949e]">{l}</div>
+    d[k] ? (
+      <i
+        key={k}
+        style={{ width: `${((d[k] / total) * 100).toFixed(1)}%`, background: c }}
+        className="block h-full"
+        title={`${k} · ${d[k]}`}
+      />
+    ) : null;
+  const Card = ({ n, l, hero = false }: { n: number; l: string; hero?: boolean }) => (
+    <div
+      className={`relative overflow-hidden rounded-xl border border-border bg-card p-4 ${
+        hero
+          ? "bg-[linear-gradient(180deg,rgb(56_189_248/0.06),transparent)] before:absolute before:left-4 before:right-4 before:top-0 before:h-px before:bg-[linear-gradient(90deg,transparent,var(--color-accent),transparent)] before:content-['']"
+          : ""
+      }`}
+    >
+      <div
+        className={`font-variant-numeric:tabular-nums font-bold leading-[1.05] tracking-[-0.02em] ${
+          hero
+            ? "bg-[linear-gradient(180deg,#fff,#a3a8b3)] bg-clip-text text-[36px] text-transparent"
+            : "text-[24px]"
+        }`}
+      >
+        {n.toLocaleString("zh-CN")}
+      </div>
+      <div className="mt-1.5 text-[12px] text-fg-3">{l}</div>
     </div>
   );
   return (
     <Page title="概览" sub="本地统计 · 数据仅存于本机，无 PII">
-      <div className="mb-6 grid grid-cols-4 gap-3.5">
-        <Card n={s.detections} l="AI 检测总数" />
+      <div className="mb-7 grid grid-cols-4 gap-3.5">
+        <Card hero n={s.detections} l="AI 检测总数" />
         <Card n={s.cacheHits} l="缓存命中 · 省下的 LLM 调用" />
         <Card n={bl} l="已拉黑账号" />
         <Card n={(d.spam ?? 0) + (d.porn_bot ?? 0)} l="判定为垃圾/色情bot" />
       </div>
-      <h2 className="text-[15px] font-bold">检测类别分布</h2>
-      <div className="my-2 flex h-2.5 overflow-hidden rounded-full">
-        {seg("porn_bot", "#ef4444")}
+      <SectionH>检测类别分布</SectionH>
+      <div className="my-2 flex h-2.5 overflow-hidden rounded-full bg-card">
+        {seg("porn_bot", "#a855f7")}
         {seg("spam", "#ef4444")}
         {seg("likely_spam", "#f59e0b")}
         {seg("uncertain", "#8b949e")}
-        {seg("legit", "#22c55e")}
+        {seg("legit", "#10b981")}
       </div>
-      <div className="mt-3 flex flex-wrap gap-4 text-xs text-[#8b949e]">
-        <span>● 色情/垃圾bot {(d.porn_bot ?? 0) + (d.spam ?? 0)}</span>
-        <span>● 疑似 {d.likely_spam ?? 0}</span>
-        <span>● 不确定 {d.uncertain ?? 0}</span>
-        <span>● 正常 {d.legit ?? 0}</span>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[12px] text-fg-3">
+        <span className="inline-flex items-center gap-1.5">
+          <i className="block h-2 w-2 rounded-full bg-violet" />
+          色情 bot {d.porn_bot ?? 0}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <i className="block h-2 w-2 rounded-full bg-danger" />
+          垃圾 {d.spam ?? 0}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <i className="block h-2 w-2 rounded-full bg-warn" />
+          疑似 {d.likely_spam ?? 0}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <i className="block h-2 w-2 rounded-full bg-fg-3" />
+          不确定 {d.uncertain ?? 0}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <i className="block h-2 w-2 rounded-full bg-ok" />
+          正常 {d.legit ?? 0}
+        </span>
       </div>
     </Page>
   );
@@ -119,66 +209,70 @@ function Blocklist() {
   );
   const src: Record<string, string> = { manual: "手动", block_all: "一键全部", list_hit: "名单命中" };
   return (
-    <Page title="拉黑记录" sub={`共 ${list.length} 条 · 取消拉黑用于纠正误判（账号会重新可见）`}>
+    <Page
+      title="拉黑记录"
+      sub={`共 ${list.length} 条 · 取消拉黑用于纠正误判（账号会重新可见）`}
+    >
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="搜索 @handle / 显示名 / 理由"
-        className="mb-4 w-[320px] rounded-lg border border-white/[0.12] bg-white/5 px-3 py-2 text-[13px]"
+        className="mb-4 w-[320px] rounded-lg border border-border-2 bg-card px-3 py-2 text-[13px] outline-none transition focus:border-accent"
       />
-      <table className="w-full border-collapse text-[13px]">
-        <thead>
-          <tr>
-            <th className={th}>账号</th>
-            <th className={th}>判定</th>
-            <th className={th}>理由</th>
-            <th className={th}>来源</th>
-            <th className={th}>时间</th>
-            <th className={th} />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td className={td}>
-                <div className="flex min-w-0 items-center gap-2">
-                  <Avatar url={r.avatarUrl} name={r.displayName || r.handle} />
-                  <div className="min-w-0">
-                    <div className="max-w-[220px] truncate font-semibold">
-                      {r.displayName || `@${r.handle}`}
-                    </div>
-                    <div className="max-w-[220px] truncate text-xs text-[#8b949e]">
-                      @{r.handle}
-                      {idTail(r.id, r.handle)}
+      <div className="overflow-hidden rounded-xl border border-border bg-card/40">
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr>
+              <th className={th}>账号</th>
+              <th className={th}>判定</th>
+              <th className={th}>理由</th>
+              <th className={th}>来源</th>
+              <th className={th}>时间</th>
+              <th className={th} />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className={trHover}>
+                <td className={td}>
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <Avatar url={r.avatarUrl} name={r.displayName || r.handle} />
+                    <div className="min-w-0">
+                      <div className="max-w-[220px] truncate font-semibold">
+                        {r.displayName || `@${r.handle}`}
+                      </div>
+                      <div className="max-w-[220px] truncate text-[12px] text-fg-3">
+                        @{r.handle}
+                        {idTail(r.id, r.handle)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </td>
-              <td className={td}>
-                {r.verdict ? <Tag label={r.verdict.label} conf={r.verdict.confidence} /> : "—"}
-              </td>
-              <td className={`${td} max-w-[360px] whitespace-normal text-[#8b949e]`}>
-                {r.reason || ""}
-              </td>
-              <td className={`${td} text-[#8b949e]`}>{src[r.source]}</td>
-              <td className={`${td} text-[#8b949e]`}>{when(r.ts)}</td>
-              <td className={td}>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await removeBlock(r.id);
-                    load();
-                  }}
-                  className="cursor-pointer rounded-md border border-white/[0.12] bg-white/[0.06] px-2.5 py-1 text-xs hover:bg-white/[0.12]"
-                >
-                  取消拉黑
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {!list.length && <div className="py-10 text-center text-[#8b949e]">还没有拉黑记录</div>}
+                </td>
+                <td className={td}>
+                  {r.verdict ? <Tag label={r.verdict.label} conf={r.verdict.confidence} /> : "—"}
+                </td>
+                <td className={`${td} max-w-[360px] whitespace-normal text-fg-3`}>
+                  {r.reason || ""}
+                </td>
+                <td className={`${td} text-fg-3`}>{src[r.source]}</td>
+                <td className={`${td} text-fg-3`}>{when(r.ts)}</td>
+                <td className={td}>
+                  <Btn
+                    size="sm"
+                    onClick={async () => {
+                      await removeBlock(r.id);
+                      load();
+                    }}
+                  >
+                    取消拉黑
+                  </Btn>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!list.length && <div className="py-10 text-center text-fg-3">还没有拉黑记录</div>}
     </Page>
   );
 }
@@ -187,44 +281,49 @@ function Cache() {
   const [rows, setRows] = useState<CacheRow[]>([]);
   useEffect(() => void getCacheRows().then(setRows), []);
   return (
-    <Page title="检测缓存" sub={`共 ${rows.length} 条 · 同账号再出现直接用缓存，0 次 LLM`}>
-      <table className="w-full border-collapse text-[13px]">
-        <thead>
-          <tr>
-            <th className={th}>账号</th>
-            <th className={th}>判定</th>
-            <th className={th}>理由</th>
-            <th className={th}>模型</th>
-            <th className={th}>时间</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((c) => (
-            <tr key={c.id}>
-              <td className={td}>
-                <div className="flex items-center gap-2">
-                  <Avatar url={c.avatarUrl} name={c.displayName || c.handle} />
-                  <div className="min-w-0">
-                    <div className="max-w-[220px] truncate font-semibold">
-                      {c.displayName || `@${c.handle}`}
-                    </div>
-                    <div className="text-xs text-[#8b949e]">@{c.handle}</div>
-                  </div>
-                </div>
-              </td>
-              <td className={td}>
-                <Tag label={c.verdict.label} conf={c.verdict.confidence} />
-              </td>
-              <td className={`${td} max-w-[360px] whitespace-normal text-[#8b949e]`}>
-                {c.verdict.reasons[0] ?? ""}
-              </td>
-              <td className={`${td} text-[#8b949e]`}>{c.model}</td>
-              <td className={`${td} text-[#8b949e]`}>{when(c.ts)}</td>
+    <Page
+      title="检测缓存"
+      sub={`共 ${rows.length} 条 · 同账号再出现直接用缓存，0 次 LLM`}
+    >
+      <div className="overflow-hidden rounded-xl border border-border bg-card/40">
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr>
+              <th className={th}>账号</th>
+              <th className={th}>判定</th>
+              <th className={th}>理由</th>
+              <th className={th}>模型</th>
+              <th className={th}>时间</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {!rows.length && <div className="py-10 text-center text-[#8b949e]">缓存为空</div>}
+          </thead>
+          <tbody>
+            {rows.map((c) => (
+              <tr key={c.id} className={trHover}>
+                <td className={td}>
+                  <div className="flex items-center gap-2.5">
+                    <Avatar url={c.avatarUrl} name={c.displayName || c.handle} />
+                    <div className="min-w-0">
+                      <div className="max-w-[220px] truncate font-semibold">
+                        {c.displayName || `@${c.handle}`}
+                      </div>
+                      <div className="text-[12px] text-fg-3">@{c.handle}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className={td}>
+                  <Tag label={c.verdict.label} conf={c.verdict.confidence} />
+                </td>
+                <td className={`${td} max-w-[360px] whitespace-normal text-fg-3`}>
+                  {c.verdict.reasons[0] ?? ""}
+                </td>
+                <td className={`${td} text-fg-3`}>{c.model}</td>
+                <td className={`${td} text-fg-3`}>{when(c.ts)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!rows.length && <div className="py-10 text-center text-fg-3">缓存为空</div>}
     </Page>
   );
 }
@@ -239,16 +338,22 @@ function Toggle({
     <label className="flex cursor-pointer items-start gap-3 py-2">
       <button
         type="button"
+        role="switch"
+        aria-checked={on}
         onClick={() => onChange(!on)}
-        className={`mt-0.5 h-5 w-9 flex-none rounded-full transition ${on ? "bg-[#0ea5e9]" : "bg-white/15"}`}
+        className={`mt-0.5 h-5 w-9 flex-none rounded-full transition ${
+          on ? "bg-accent" : "bg-[rgb(255_255_255/0.15)]"
+        }`}
       >
         <span
-          className={`block h-4 w-4 rounded-full bg-white transition ${on ? "translate-x-4" : "translate-x-0.5"}`}
+          className={`block h-4 w-4 rounded-full bg-white transition ${
+            on ? "translate-x-4" : "translate-x-0.5"
+          }`}
         />
       </button>
       <span>
         <span className="font-medium">{label}</span>
-        {hint && <span className="block text-xs text-[#8b949e]">{hint}</span>}
+        {hint && <span className="block text-[12px] text-fg-3">{hint}</span>}
       </span>
     </label>
   );
@@ -270,9 +375,12 @@ function Settings() {
   };
   async function ghLogin() {
     setFlow("正在获取设备码…");
-    const s = await bg<{ user_code: string; verification_uri: string; device_code: string; interval: number }>(
-      { type: "gh_start" },
-    );
+    const s = await bg<{
+      user_code: string;
+      verification_uri: string;
+      device_code: string;
+      interval: number;
+    }>({ type: "gh_start" });
     if (!s.ok || !s.data) {
       setFlow(`失败：${s.error ?? "请确认 OAuth App 已勾选 Enable Device Flow"}`);
       return;
@@ -293,53 +401,51 @@ function Settings() {
   }
   return (
     <Page title="设置" sub="登录与配置仅存于本机">
-      <div className="max-w-[680px] space-y-3 text-[#c9d1d9]">
-        <p>
-          <b>GitHub 登录</b> — 上报与服务端 AI 分析需要（防滥用）。
-        </p>
-        <p>
+      <div className="max-w-[680px] space-y-8">
+        <section>
+          <SectionH>GitHub 登录</SectionH>
+          <p className="mb-3 text-[13px] text-fg-2">
+            上报与服务端 AI 分析需要 GitHub 登录（防滥用、可追溯）。Device Flow 无 secret、无回调。
+          </p>
           {login ? (
-            <>
-              已登录 <code className="rounded bg-white/[0.06] px-1.5 py-0.5">@{login}</code> ·{" "}
-              <button
-                type="button"
-                className="cursor-pointer text-[#38bdf8]"
+            <div className="flex items-center gap-2 text-[13px]">
+              <span className="inline-flex items-center gap-1.5">
+                <i className="block h-1.5 w-1.5 rounded-full bg-ok" />
+                已登录
+              </span>
+              <code className="rounded bg-card-hi px-2 py-0.5 font-mono text-[12px] text-accent">
+                @{login}
+              </code>
+              <Btn
+                size="sm"
+                tier="ghost"
                 onClick={async () => {
                   await bg({ type: "gh_logout" });
                   refresh();
                 }}
               >
                 登出
-              </button>
-            </>
+              </Btn>
+            </div>
           ) : (
-            <button
-              type="button"
-              onClick={ghLogin}
-              className="cursor-pointer rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[13px] hover:bg-white/[0.12]"
-            >
+            <Btn tier="primary" onClick={ghLogin}>
               用 GitHub 登录
-            </button>
+            </Btn>
           )}
-        </p>
-        {flow && <p className="text-[#f59e0b]">{flow}</p>}
+          {flow && <p className="mt-2 text-[12px] text-warn">{flow}</p>}
+        </section>
 
         {st && (
-          <div className="pt-6">
-            <p>
-              <b>检测行为</b> — 改动在下次刷新页面后生效。
-            </p>
+          <section>
+            <SectionH>检测行为</SectionH>
+            <p className="mb-2 text-[12px] text-fg-3">改动在下次刷新页面后生效</p>
             <Toggle
               on={st.enabled}
               onChange={(v) => save("enabled", v)}
               label="启用被动检测"
               hint="关闭后扩展在 X 上完全不工作"
             />
-            <Toggle
-              on={st.bubble}
-              onChange={(v) => save("bubble", v)}
-              label="显示角标气泡"
-            />
+            <Toggle on={st.bubble} onChange={(v) => save("bubble", v)} label="显示角标气泡" />
             <Toggle
               on={st.bubblePos === "tr"}
               onChange={(v) => save("bubblePos", v ? "tr" : "br")}
@@ -352,45 +458,49 @@ function Settings() {
               label="回复区逐个自动检查"
               hint="关闭可显著降低 LLM 调用 / 更克制"
             />
-            <div className="pt-3 text-xs text-[#8b949e]">
-              高级：服务端地址（留空=默认线上）
-              <div className="mt-1 flex gap-2">
-                <input
-                  value={st.edgeBase}
-                  onChange={(e) => setSt({ ...st, edgeBase: e.target.value })}
-                  placeholder="https://…workers.dev"
-                  className="w-[340px] rounded-lg border border-white/[0.12] bg-white/5 px-2.5 py-1.5 text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={() => save("edgeBase", st.edgeBase.trim())}
-                  className="cursor-pointer rounded-md border border-white/[0.12] bg-white/[0.06] px-2.5 py-1 text-xs hover:bg-white/[0.12]"
-                >
-                  保存
-                </button>
-              </div>
-            </div>
-          </div>
+          </section>
         )}
 
-        <div className="pt-6">
-          <p>
-            <b>数据与隐私</b> — 检测缓存、拉黑记录、统计、登录态均仅存于本机，无 PII。
+        {st && (
+          <section>
+            <SectionH>高级 · 服务端地址</SectionH>
+            <p className="mb-2 text-[12px] text-fg-3">
+              留空 = 默认线上 <code className="font-mono">{EDGE_DEFAULT}</code>
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={st.edgeBase}
+                onChange={(e) => setSt({ ...st, edgeBase: e.target.value })}
+                placeholder={EDGE_DEFAULT}
+                className="w-[340px] rounded-lg border border-border-2 bg-card px-3 py-1.5 text-[12px] outline-none transition focus:border-accent"
+              />
+              <Btn tier="primary" size="sm" onClick={() => save("edgeBase", st.edgeBase.trim())}>
+                保存
+              </Btn>
+            </div>
+          </section>
+        )}
+
+        <section>
+          <SectionH>数据与隐私</SectionH>
+          <p className="mb-3 text-[13px] text-fg-2">
+            检测缓存、拉黑记录、统计、登录态均仅存于本机；除公开 X 数字 ID 外不存 PII。
           </p>
-          <button
-            type="button"
-            onClick={async () => {
-              if (!confirm("清除全部本地数据（缓存/拉黑记录/统计/登录）？不可恢复。")) return;
-              await clearAllLocal();
-              setCleared(true);
-              refresh();
-            }}
-            className="mt-2 cursor-pointer rounded-md border border-[#ef4444]/40 bg-[#ef4444]/10 px-3 py-1.5 text-[13px] text-[#fca5a5] hover:bg-[#ef4444]/20"
-          >
-            清除本地数据
-          </button>
-          {cleared && <span className="ml-3 text-xs text-[#22c55e]">已清除</span>}
-        </div>
+          <div className="flex items-center gap-3">
+            <Btn
+              tier="danger"
+              onClick={async () => {
+                if (!confirm("清除全部本地数据（缓存/拉黑记录/统计/登录）？不可恢复。")) return;
+                await clearAllLocal();
+                setCleared(true);
+                refresh();
+              }}
+            >
+              清除本地数据
+            </Btn>
+            {cleared && <span className="text-[12px] text-ok">已清除</span>}
+          </div>
+        </section>
       </div>
     </Page>
   );
@@ -398,24 +508,71 @@ function Settings() {
 
 const About = () => (
   <Page title="关于" sub="x-spam-sentinel · 公益、开源">
-    <div className="max-w-[680px] space-y-2.5 leading-7 text-[#c9d1d9]">
-      <p>基于 AI 的 X(Twitter) 反垃圾/色情机器人扩展。被动检测、本地优先、中心服务（Cloudflare）协同；用户一键拉黑即视为人工确认。</p>
+    <div className="max-w-[680px] space-y-4 text-[13px] leading-7 text-fg-2">
       <p>
-        许可证：<code className="rounded bg-white/[0.06] px-1.5 py-0.5">AGPL-3.0</code> · 仓库：{" "}
-        <a href={REPO} target="_blank" rel="noopener" className="text-[#38bdf8]">
-          github.com/onenorthlab/x-spam-sentinel
-        </a>
+        基于 AI 的 X(Twitter) 反垃圾 / 色情机器人扩展。被动检测、本地优先、中心服务（Cloudflare）协同；用户一键拉黑即视为人工确认信号之一。
       </p>
-      <p>隐私：除公开的 X 数字 ID 外不存储任何 PII，数据默认仅在本机。</p>
-      <p>
-        治理：AI 判定永不自动公开，须人工确认；{" "}
-        <a href={`${REPO}/blob/main/GOVERNANCE.md`} target="_blank" rel="noopener" className="text-[#38bdf8]">
-          申诉与移除机制
-        </a>
-        。
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="text-[11px] uppercase tracking-[0.15em] text-fg-3">许可证</div>
+          <code className="mt-1 inline-block font-mono text-[13px] text-fg">AGPL-3.0</code>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="text-[11px] uppercase tracking-[0.15em] text-fg-3">仓库</div>
+          <a
+            href={REPO}
+            target="_blank"
+            rel="noopener"
+            className="mt-1 inline-block text-[13px] text-accent hover:underline"
+          >
+            github.com/onenorthlab/x-spam-sentinel ↗
+          </a>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="text-[11px] uppercase tracking-[0.15em] text-fg-3">公榜</div>
+          <a
+            href={`${EDGE_DEFAULT}/list`}
+            target="_blank"
+            rel="noopener"
+            className="mt-1 inline-block text-[13px] text-accent hover:underline"
+          >
+            最近 100 条已确认 ↗
+          </a>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="text-[11px] uppercase tracking-[0.15em] text-fg-3">治理</div>
+          <a
+            href={`${REPO}/blob/main/docs/GOVERNANCE.md`}
+            target="_blank"
+            rel="noopener"
+            className="mt-1 inline-block text-[13px] text-accent hover:underline"
+          >
+            申诉与移除机制 ↗
+          </a>
+        </div>
+      </div>
+      <p className="text-[12px] text-fg-3">
+        隐私：除公开的 X 数字 ID 外不存储任何 PII，数据默认仅在本机。AI 判定永不自动公开，须人工或社区共识（≥3 个独立 GitHub 上报人）确认。
       </p>
     </div>
   </Page>
+);
+
+const Shield = () => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+  >
+    <path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
 );
 
 const TABS = [
@@ -431,31 +588,47 @@ export function App() {
   const Active = TABS.find((t) => t[0] === tab)?.[2] ?? Overview;
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 flex h-screen w-[210px] flex-none flex-col gap-4 border-r border-white/[0.08] p-[18px_14px]">
-        <div className="flex items-center gap-2 text-[15px]">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-          <b>x-spam-sentinel</b>
+      <aside className="sticky top-0 flex h-screen w-[220px] flex-none flex-col gap-5 border-r border-border bg-card/40 px-4 py-5 backdrop-blur">
+        <div className="flex items-center gap-2 px-1 text-[15px] font-semibold tracking-[0.01em]">
+          <span className="text-accent">
+            <Shield />
+          </span>
+          x-spam-sentinel
         </div>
-        <nav className="flex flex-col gap-1">
+        <nav className="flex flex-col gap-0.5" aria-label="管理面板导航">
           {TABS.map(([id, label]) => (
             <button
-              type="button"
               key={id}
+              type="button"
               onClick={() => setTab(id)}
-              className={`cursor-pointer rounded-lg px-3 py-2 text-left text-[13px] ${
+              className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition ${
                 tab === id
-                  ? "bg-[#0ea5e9]/15 text-[#38bdf8]"
-                  : "text-[#8b949e] hover:bg-white/5 hover:text-[#e6edf3]"
+                  ? "bg-accent-soft text-accent shadow-[inset_2px_0_0_var(--color-accent)]"
+                  : "text-fg-3 hover:bg-card hover:text-fg"
               }`}
             >
               {label}
             </button>
           ))}
         </nav>
-        <div className="mt-auto text-[11px] text-[#8b949e]">
-          v{chrome.runtime.getManifest().version}
+        <div className="mt-auto space-y-1.5 text-[11px] text-fg-3">
+          <a
+            href={`${EDGE_DEFAULT}/list`}
+            target="_blank"
+            rel="noopener"
+            className="block text-accent hover:underline"
+          >
+            看公榜 ↗
+          </a>
+          <a
+            href={REPO}
+            target="_blank"
+            rel="noopener"
+            className="block text-fg-3 hover:text-fg"
+          >
+            GitHub ↗
+          </a>
+          <div className="pt-1.5">v{chrome.runtime.getManifest().version}</div>
         </div>
       </aside>
       <Active />
