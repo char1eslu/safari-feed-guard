@@ -3,6 +3,10 @@ import { defineConfig } from "wxt";
 
 // Make X Great Again (MXGA) — strictly passive. Only the Worker host
 // permission for our own API; X DOM is read via the content-script match.
+//
+// Manifest is generated per-mode so the production build that ships to the
+// Chrome Web Store doesn't contain dev-only host permissions (localhost,
+// 127.0.0.1) — reviewers reject those.
 export default defineConfig({
   modules: ["@wxt-dev/module-react"],
   vite: () => ({ plugins: [tailwindcss()] }),
@@ -10,10 +14,19 @@ export default defineConfig({
   // .output/chrome-mv3 into your own Chrome (logged into X) manually;
   // WXT still watches + hot-reloads it.
   webExt: { disabled: true },
-  manifest: {
+  manifest: ({ mode }) => ({
+    // Brand-forward name. Owner accepted the (small) reviewer risk of the
+    // "Make X Great Again" phrasing in exchange for a stronger product
+    // identity. CWS_LISTING.md surfaces the trade-off in case the listing
+    // ever gets rejected and we want to fall back to "MXGA — X spam shield".
     name: "Make X Great Again",
+    // Single-purpose description — what's shipped today, plus the framing
+    // that anchors the brand: AI-driven, ambient, privacy-first.
     description:
-      "Make X usable again. Passive AI: spam shield + KOL signal score + profile digest + social graph hints. Public-good, open source.",
+      "AI 驱动的 X 旁路扩展 · 你刷 X 时它在后台静默识别色情/广告 spam 机器人，给你一键真拉黑。完全开源，零数据收集。",
+    // Optional but recommended — author + homepage_url improve listing trust.
+    author: { email: "foru17@foxmail.com" },
+    homepage_url: "https://x.zuoluo.tv",
     // Mascot 「小蓝」 — chubby blue bird with red MXGA cap, raised fist pose.
     // Generated PNGs live in extension/public/icon/<size>.png (WXT auto-picks
     // them up from `public/` so no extra config needed).
@@ -29,16 +42,26 @@ export default defineConfig({
     host_permissions: [
       // Public Worker entry point (custom domain).
       "https://x.zuoluo.tv/*",
-      // Legacy workers.dev URL kept as fallback for installs that still
-      // hold an old edgeBase setting; safe to drop after the user base
-      // has cycled the new release.
+      // Legacy workers.dev URL — kept as a fallback ONLY for installs that
+      // still hold an old edgeBase setting; drop after the user base has
+      // fully cycled to the custom domain (post v0.3.x).
       "https://x-spam-sentinel-edge.zuoluotv.workers.dev/*",
-      "https://github.com/*",
-      "https://api.github.com/*",
-      "http://127.0.0.1:8787/*",
-      "http://localhost:8787/*",
+      // GitHub Device Flow OAuth + user lookup. Narrowed from the previous
+      // blanket `https://github.com/*` + `https://api.github.com/*` grants
+      // to only the three endpoints we actually call — passes a stricter
+      // reviewer audit and minimizes user-facing permission prompts.
+      // Endpoints:
+      //   POST https://github.com/login/device/code      (start device flow)
+      //   POST https://github.com/login/oauth/access_token (poll for token)
+      //   GET  https://api.github.com/user               (fetch numeric id)
+      "https://github.com/login/*",
+      "https://api.github.com/user",
+      // Dev-only — never shipped to the Web Store.
+      ...(mode === "development"
+        ? ["http://127.0.0.1:8787/*", "http://localhost:8787/*"]
+        : []),
     ],
-    action: { default_title: "Make X Great Again" },
+    action: { default_title: "MXGA" },
     options_ui: { open_in_tab: true },
-  },
+  }),
 });

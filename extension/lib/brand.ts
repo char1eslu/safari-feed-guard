@@ -8,8 +8,9 @@ export const BRAND = {
   name: "Make X Great Again",
   /** Short acronym for compact surfaces (popup header, content-script badges). */
   acronym: "MXGA",
-  /** Single-line positioning. */
-  tagline: "装上 Chrome，AI 替你拦垃圾、识水军、汇热推",
+  /** Single-line positioning. Mirrored from services/edge/src/brand.ts —
+   *  AI-native / ambient / privacy-first 是 2026 三个核心定位词。 */
+  tagline: "AI 驱动的 X 旁路扩展 · 让 X 再次值得刷",
   /** Public GitHub repo URL (no trailing slash). */
   repo: "https://github.com/foru17/make-x-great-again",
   /** Latest GitHub Release page (auto-redirects to newest .zip). */
