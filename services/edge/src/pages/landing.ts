@@ -246,20 +246,19 @@ const HERO = `
   <span class="eyebrow">
     <span class="dot" aria-hidden="true"></span>
     <span class="x">${ICONS.X}</span>
-    AI-Native<span class="sep">·</span>Ambient<span class="sep">·</span>Open Source ${BRAND.license}
+    为 X 设计<span class="sep">·</span>开源 ${BRAND.license}
   </span>
-  <h1>Make <span class="xmark">${ICONS.X}</span> Great Again<br><span class="sub">AI 驱动的 X 旁路扩展，让 X 再次值得刷。</span></h1>
-  <p class="lede">你刷 X，它在背景工作。AI 实时识别色情/广告 bot 和水军，给你一键真拉黑。Ambient AI 哲学——无需提示、无需介入、零数据上传、100% 开源可查。</p>
+  <h1>Make <span class="xmark">${ICONS.X}</span> Great Again<br><span class="sub">让 X 重新能好好刷。</span></h1>
+  <p class="lede">AI 帮你挑出广告号、色情 bot 和水军，一键真拉黑——驱动 X 自己的屏蔽接口，不是隐藏。</p>
   <div class="ctas">
     <a class="btn primary" href="${LINKS.RELEASE_URL}" id="installBtn" aria-label="免费装到 Chrome">${ICON_DOWNLOAD}<span>免费装到 Chrome</span></a>
     <a class="btn" href="${BRAND.repo}" aria-label="在 GitHub 上查看源码">${ICON_GH}<span>查看源码</span></a>
     <a class="btn" href="/list" aria-label="看公榜">${ICON_LIST}<span>看公榜</span></a>
   </div>
   <p class="meta">
-    <span>Zero-PII</span><span class="dot" aria-hidden="true"></span>
-    <span>零追踪请求</span><span class="dot" aria-hidden="true"></span>
-    <span>无需注册</span><span class="dot" aria-hidden="true"></span>
-    <span>每行代码都可查</span>
+    <span>不存身份信息</span><span class="dot" aria-hidden="true"></span>
+    <span>不用注册</span><span class="dot" aria-hidden="true"></span>
+    <span>源码全开</span>
   </p>
   <div class="install-note" id="installNote" role="status">
     <strong>开发者模式手装</strong>（商店审核中，先这样用）：
