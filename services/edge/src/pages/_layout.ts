@@ -1,12 +1,14 @@
+import { googleAnalyticsHead } from "../analytics";
+import { BRAND } from "../brand";
+
 // Shared shell for the public Worker pages (/ landing, /list public board).
-// Self-contained — no external fonts / JS / CSS so the page is servable
-// under a strict CSP and stays well under 1.5s LCP on a cold edge.
+// Self-contained CSS; analytics is injected from a small shared module so the
+// tracker id is not duplicated across pages.
 //
 // Visual language: base-ui.com inspired. Type-led hierarchy, accent reserved
 // for state (focus, success, active). Sharp 6-10px corners.
 // Theme: dark + light, picks system preference by default, overridable via
 // the nav theme button (state persisted in localStorage as `mxga_theme`).
-import { BRAND } from "../brand";
 
 const GH_REPO = BRAND.repo;
 const RELEASE_URL = BRAND.release;
@@ -252,6 +254,7 @@ export function layout(o: LayoutOpts): string {
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="${BRAND.edgeBase}/og.png">
 <script>${THEME_BOOT}</script>
+${googleAnalyticsHead()}
 ${o.head ?? ""}
 <style>${CSS}${o.css ?? ""}</style>
 </head><body>

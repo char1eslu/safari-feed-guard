@@ -1,6 +1,7 @@
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
+import { ANALYTICS_CSP } from "./analytics";
 import { adminHtml } from "./pages/admin";
 import { landingHtml } from "./pages/landing";
 import { listHtml } from "./pages/list";
@@ -896,16 +897,9 @@ app.get("/v1/list", async (c) => {
 
 // CSP for the SSR HTML pages — strict by default, with X's avatar CDN +
 // unavatar.io allow-listed for the public board. Inline style/script are
-// required because we ship everything in one document; rotate to nonce if
-// these pages ever import 3rd-party deps.
-const PAGE_CSP =
-  "default-src 'self'; " +
-  "img-src 'self' data: https://pbs.twimg.com https://*.twimg.com https://unavatar.io; " +
-  "style-src 'self' 'unsafe-inline'; " +
-  "script-src 'self' 'unsafe-inline'; " +
-  "connect-src 'self'; " +
-  "frame-ancestors 'none'; " +
-  "base-uri 'none'";
+// Public pages are still single-document HTML. GA4 is the only third-party
+// script and its domains are centralized in analytics.ts.
+const PAGE_CSP = `default-src 'self'; img-src 'self' data: https://pbs.twimg.com https://*.twimg.com https://unavatar.io ${ANALYTICS_CSP.imgSrc}; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' ${ANALYTICS_CSP.scriptSrc}; connect-src 'self' ${ANALYTICS_CSP.connectSrc}; frame-ancestors 'none'; base-uri 'none'`;
 
 function pageHeaders(c: Ctx, cacheSeconds: number): void {
   c.header("Content-Security-Policy", PAGE_CSP);
