@@ -61,6 +61,42 @@ export const STYLE = `
 }
 .btn:hover { filter: brightness(1.08); }
 .btn:disabled { opacity: .55; cursor: default; }
+
+/* Per-row block button — same color language as bulk btn, smaller scale. */
+.xss-act {
+  flex: none; border: 0; border-radius: 8px; padding: 5px 10px;
+  font-size: 11.5px; font-weight: 600; cursor: pointer; color: #fff;
+  background: var(--danger); transition: filter .14s ease, background .14s;
+  white-space: nowrap;
+}
+.xss-act:hover { filter: brightness(1.08); }
+.xss-act:disabled { cursor: default; }
+.xss-act.done {
+  background: var(--safe); color: #fff; opacity: .9;
+}
+.xss-act.retry {
+  background: transparent; color: var(--warn);
+  border: 1px solid var(--warn);
+}
+
+/* Per-row select checkbox — themed, replaces native browser styling. */
+.xss-row-cb {
+  width: 15px; height: 15px; flex: none; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  border: 1.5px solid var(--border); border-radius: 4px;
+  background: transparent; transition: border-color .12s, background .12s;
+  position: relative; margin-top: 6px;
+}
+.xss-row-cb:hover { border-color: var(--danger); }
+.xss-row-cb:checked {
+  background: var(--danger); border-color: var(--danger);
+}
+.xss-row-cb:checked::after {
+  content: ""; position: absolute; left: 3px; top: 0;
+  width: 5px; height: 9px; border: solid #fff;
+  border-width: 0 1.5px 1.5px 0; transform: rotate(45deg);
+}
+.xss-row-cb:disabled { opacity: .35; cursor: default; }
 .row { display: flex; gap: 14px; margin-top: 10px; font-size: 12px; }
 .lnk { color: var(--muted); cursor: pointer; }
 .lnk:hover { color: var(--text); }
@@ -173,6 +209,10 @@ export interface Finding {
   /** Set by drain() after a successful block — used by the card to strike
    *  the row through and replace the per-row button with "已拉黑". */
   blocked?: boolean;
+  /** Selection state for the bulk-block action. Undefined → treated as
+   *  selected (the default for a fresh finding). User uncheck → false →
+   *  bulk skips it; user can still per-row block manually. */
+  selected?: boolean;
   verdict: Verdict;
 }
 
@@ -244,6 +284,9 @@ export function createBubble(h: BubbleHandlers, pos: "tr" | "br" = "tr") {
     const warn = findings.length - danger;
     const pendingCount = findings.filter((x) => !x.blocked).length;
     const doneCount = findings.length - pendingCount;
+    // Bulk action operates on the subset the user has left checked.
+    // Default state of a fresh finding is selected (selected !== false).
+    const selectedPending = findings.filter((x) => !x.blocked && x.selected !== false).length;
     card.innerHTML = `
       <div class="hd">${icon("shield-alert", "var(--brand)", 16)}
         <span>本页发现 ${findings.length} 个可疑账号</span>
@@ -268,16 +311,27 @@ export function createBubble(h: BubbleHandlers, pos: "tr" | "br" = "tr") {
             const snip = f.snippet
               ? esc(f.snippet.replace(/\s+/g, " ").trim()).slice(0, 60)
               : "";
+            const id = f.userId || `h:${f.handle}`;
+            const checked = f.blocked ? false : f.selected !== false;
+            const actClass = f.blocked
+              ? "xss-act done"
+              : f.blockFailed
+                ? "xss-act retry"
+                : "xss-act";
+            const actText = f.blocked ? "已拉黑" : f.blockFailed ? "重试" : "拉黑";
             return `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 4px">
+              <input type="checkbox" class="xss-row-cb" data-sel="${id}"
+                aria-label="选中 @${esc(f.handle)}"
+                ${checked ? "checked" : ""} ${f.blocked ? "disabled" : ""}>
               ${av}
               <div style="min-width:0;flex:1">
-                <div style="font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+                <div style="font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap${f.blocked ? ";text-decoration:line-through;opacity:.55" : ""}">${name}</div>
                 <div style="font-size:11px;color:${col}">@${esc(f.handle)} · ${m.zh} ${(f.verdict.confidence * 100).toFixed(0)}%</div>
                 ${snip ? `<div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap${f.blocked ? ";text-decoration:line-through;opacity:.55" : ""}">${snip}</div>` : ""}
                 ${f.blockFailed ? `<div style="font-size:11px;color:var(--warn)">自动屏蔽失败 · <a href="https://x.com/${esc(f.handle)}" target="_blank" rel="noopener" style="color:var(--warn)">手动屏蔽</a></div>` : ""}
                 ${f.blocked ? `<div style="font-size:11px;color:var(--safe)">✓ 已拉黑</div>` : ""}
               </div>
-              <button class="xss-act" data-one="${f.userId || "h:" + f.handle}"${f.blocked ? " disabled" : ""}>${f.blocked ? "已拉黑" : f.blockFailed ? "重试" : "拉黑"}</button>
+              <button class="${actClass}" data-one="${id}"${f.blocked ? " disabled" : ""}>${actText}</button>
             </div>`;
           })
           .join("")}
@@ -285,7 +339,9 @@ export function createBubble(h: BubbleHandlers, pos: "tr" | "br" = "tr") {
       ${
         pendingCount === 0
           ? `<button class="btn" disabled style="background:var(--safe)">✓ 已全部处理 (${doneCount})</button>`
-          : `<button class="btn" data-block>一键拉黑剩余 ${pendingCount}${doneCount ? ` · 已完成 ${doneCount}` : ""}</button>`
+          : selectedPending === 0
+            ? `<button class="btn" disabled style="opacity:.55">未选中任何账号 (剩余 ${pendingCount})</button>`
+            : `<button class="btn" data-block>一键拉黑选中 ${selectedPending}${doneCount ? ` · 已完成 ${doneCount}` : ""}${selectedPending < pendingCount ? ` · 跳过 ${pendingCount - selectedPending}` : ""}</button>`
       }
       <div class="row"><span class="lnk" data-each>逐个查看处理</span>
         <span class="lnk" data-ign>忽略本页</span></div>`;
@@ -302,7 +358,21 @@ export function createBubble(h: BubbleHandlers, pos: "tr" | "br" = "tr") {
         if (f) {
           h.onBlockOne(f);
           btn.textContent = "已拉黑";
+          btn.classList.remove("retry");
+          btn.classList.add("done");
           (btn as HTMLButtonElement).disabled = true;
+        }
+      });
+    });
+    // Per-row select toggle — uncheck excludes from the bulk action so the
+    // user can opt-out specific accounts before "一键拉黑".
+    card.querySelectorAll<HTMLInputElement>("[data-sel]").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const id = cb.dataset.sel;
+        const f = findings.find((x) => (x.userId || `h:${x.handle}`) === id);
+        if (f) {
+          f.selected = cb.checked;
+          renderCard(); // re-render so bulk button count updates immediately
         }
       });
     });
@@ -310,7 +380,9 @@ export function createBubble(h: BubbleHandlers, pos: "tr" | "br" = "tr") {
     b?.addEventListener("click", () => {
       b.disabled = true;
       b.textContent = "处理中…";
-      h.onBlockAll(findings);
+      // Bulk only blocks the SELECTED, unblocked findings. The drain() in
+      // content.ts will get a curated array, not "all findings".
+      h.onBlockAll(findings.filter((x) => !x.blocked && x.selected !== false));
     });
   }
 
