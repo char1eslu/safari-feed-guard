@@ -7,8 +7,8 @@
 // Why a separate file (not folded into cache.ts):
 //   - This is admin-curated truth, not a per-account L2 cache row.
 //   - The cache.ts TTL story (3d uncertain / 30d spam) doesn't fit here;
-//     whitelist removal is a maintainer action, not a time event, so we
-//     just refresh the whole set on the cadence below.
+//     whitelist removal is a maintainer action, not a time event, so each
+//     sync refreshes the whole set instead of relying on deltas.
 //   - Lookups are by handle AND by numeric uid (X changes handles).
 
 import { BRAND } from "./brand";
@@ -62,7 +62,16 @@ async function base(): Promise<string> {
   return (await getSettings()).edgeBase || BRAND.edgeBase;
 }
 
-/** Pull the next page of whitelist entries since the stored cursor.
+function hydrateMirror(entries: Entry[]): void {
+  mirror = new Map();
+  mirrorUid = new Map();
+  for (const e of entries) {
+    mirror.set(e.h, true);
+    if (e.u) mirrorUid.set(e.u, true);
+  }
+}
+
+/** Pull a fresh whitelist snapshot.
  *  Returns whether we actually added anything (for telemetry / tests). */
 export async function refreshWhitelist(force = false): Promise<{
   added: number;
@@ -73,10 +82,11 @@ export async function refreshWhitelist(force = false): Promise<{
     return { added: 0, total: state.entries.length };
   }
   let added = 0;
-  // Paginate until we drain — server caps each page at 2000, so this is
-  // bounded for any realistic whitelist size.
-  let cursor = state.cursor;
-  let merged = state.entries.slice();
+  // Paginate a full snapshot until we drain. The whitelist is intentionally
+  // small, and a full replace also handles removals and retroactive admin
+  // fixes whose last_scored is older than the previous cursor.
+  let cursor = 0;
+  let merged: Entry[] = [];
   for (let i = 0; i < 20; i++) {
     let resp: Response;
     try {
@@ -110,8 +120,11 @@ export async function refreshWhitelist(force = false): Promise<{
     cursor = j?.latestAt ?? last.last_scored;
     if (list.length < 2000) break; // last page
   }
+  const before = new Set(state.entries.map((e) => `${e.h}:${e.u ?? ""}`));
+  added = merged.filter((e) => !before.has(`${e.h}:${e.u ?? ""}`)).length;
   const next: State = { cursor, lastSyncedAt: Date.now(), entries: merged };
   await write(next);
+  hydrateMirror(next.entries);
   return { added, total: merged.length };
 }
 
@@ -123,13 +136,14 @@ let mirrorUid: Map<string, true> | null = null;
 export async function loadWhitelistOnce(): Promise<void> {
   if (mirror) return;
   const s = await read();
-  mirror = new Map();
-  mirrorUid = new Map();
-  for (const e of s.entries) {
-    mirror.set(e.h, true);
-    if (e.u) mirrorUid.set(e.u, true);
-  }
+  hydrateMirror(s.entries);
 }
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local" || !changes[KEY]) return;
+  const next = changes[KEY].newValue as State | undefined;
+  hydrateMirror(next?.entries ?? []);
+});
 
 export function isWhitelisted(handle: string | undefined, xUserId?: string): boolean {
   if (!mirror) return false;

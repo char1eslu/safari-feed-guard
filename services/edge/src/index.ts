@@ -207,6 +207,10 @@ async function findAccount(
         WHERE lower(handle)=?
           AND (? IS NULL OR x_user_id IS NULL OR x_user_id=?)
         ORDER BY CASE
+                   WHEN status='whitelisted' THEN 0
+                   ELSE 1
+                 END,
+                 CASE
                    WHEN ? IS NOT NULL AND x_user_id=? THEN 0
                    WHEN x_user_id IS NOT NULL THEN 1
                    ELSE 2
@@ -616,23 +620,57 @@ app.post("/v1/admin/decide", async (c) => {
           : "rejected";
   const now = Date.now();
   if (xUserId) {
-    await c.env.DB.prepare(
-      "UPDATE accounts SET status=?, published_at=? WHERE lower(handle)=? AND x_user_id=?",
-    )
-      .bind(status, action === "approve" ? now : null, handle, xUserId)
-      .run();
+    if (action === "whitelist") {
+      await c.env.DB.prepare(
+        `UPDATE accounts
+            SET status='whitelisted',
+                source='admin_whitelist',
+                verdict_label='legit',
+                confidence=1.0,
+                reasons='["whitelisted by admin"]',
+                signals_hash=NULL,
+                last_scored=?,
+                published_at=NULL
+          WHERE lower(handle)=? AND x_user_id=?`,
+      )
+        .bind(now, handle, xUserId)
+        .run();
+    } else {
+      await c.env.DB.prepare(
+        "UPDATE accounts SET status=?, published_at=? WHERE lower(handle)=? AND x_user_id=?",
+      )
+        .bind(status, action === "approve" ? now : null, handle, xUserId)
+        .run();
+    }
     await c.env.DB.prepare(
       `UPDATE accounts SET status=?, published_at=NULL
         WHERE lower(handle)=? AND x_user_id IS NULL AND status='auto_pending_review'`,
     )
-      .bind(action === "approve" ? "removed" : status, handle)
+      .bind(action === "approve" || action === "whitelist" ? "removed" : status, handle)
       .run();
   } else {
-    await c.env.DB.prepare(
-      "UPDATE accounts SET status=?, published_at=? WHERE lower(handle)=? AND x_user_id IS NULL",
-    )
-      .bind(status, action === "approve" ? now : null, handle)
-      .run();
+    if (action === "whitelist") {
+      await c.env.DB.prepare(
+        `UPDATE accounts
+            SET status='whitelisted',
+                source='admin_whitelist',
+                verdict_label='legit',
+                confidence=1.0,
+                reasons='["whitelisted by admin"]',
+                signals_hash=NULL,
+                last_scored=?,
+                published_at=NULL
+          WHERE lower(handle)=? AND x_user_id IS NULL`,
+      )
+        .bind(now, handle)
+        .run();
+    } else {
+      await c.env.DB.prepare(
+        "UPDATE accounts SET status=?, published_at=? WHERE lower(handle)=? AND x_user_id IS NULL",
+      )
+        .bind(status, action === "approve" ? now : null, handle)
+        .run();
+    }
   }
   await c.env.DB.prepare(
     "INSERT INTO review_log (x_user_id,handle,action,actor,note,at) VALUES (?,?,?,?,?,?)",
@@ -723,7 +761,7 @@ app.delete("/v1/admin/whitelist", async (c) => {
   // public list if it gets re-reported.
   const r = await c.env.DB.prepare(
     `UPDATE accounts SET status='rejected', source='admin_whitelist', last_scored=?
-       WHERE handle=? AND (x_user_id IS ? OR x_user_id=?) AND status='whitelisted'`,
+      WHERE lower(handle)=? AND (x_user_id IS ? OR x_user_id=?) AND status='whitelisted'`,
   )
     .bind(now, handle, xUserId, xUserId)
     .run();
