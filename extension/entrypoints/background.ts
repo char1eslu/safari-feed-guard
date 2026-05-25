@@ -5,6 +5,7 @@ import { BRAND } from "../lib/brand";
 import { getSettings } from "../lib/settings";
 import { bumpStat, getStats } from "../lib/stats";
 import type { BgRequest, BgResponse, CurationRecord } from "../lib/types";
+import { refreshWhitelist, whitelistStatus } from "../lib/whitelist-cache";
 
 const DEFAULT_BASE = BRAND.edgeBase;
 
@@ -83,6 +84,10 @@ export default defineBackground(() => {
             sendResponse({ ok: true, data: { records: [] } });
           } else if (msg.type === "stats") {
             sendResponse({ ok: true, data: await getStats() });
+          } else if (msg.type === "whitelist_status") {
+            sendResponse({ ok: true, data: await whitelistStatus() });
+          } else if (msg.type === "whitelist_refresh") {
+            sendResponse({ ok: true, data: await refreshWhitelist(true) });
           } else if (msg.type === "lookup") {
             const r = await call(`/v1/check?ids=${encodeURIComponent(msg.userId)}`);
             const hits = (r.hits as Record<string, { label: string; confidence: number }>) ?? {};
@@ -147,4 +152,22 @@ export default defineBackground(() => {
       return true; // async response
     },
   );
+
+  // Wave 12b — keep the local whitelist mirror fresh. Once on install,
+  // once on every browser launch, and every 6h via chrome.alarms while
+  // any tab is active. All errors swallowed (the cache is best-effort —
+  // a miss just falls back to the normal classify path).
+  const ALARM = "mxga_whitelist_sync";
+  chrome.runtime.onInstalled.addListener(() => {
+    void refreshWhitelist(true);
+    chrome.alarms.create(ALARM, { periodInMinutes: 6 * 60 });
+  });
+  chrome.runtime.onStartup.addListener(() => {
+    void refreshWhitelist(false);
+  });
+  chrome.alarms.onAlarm.addListener((a) => {
+    if (a.name === ALARM) void refreshWhitelist(false);
+  });
+  // Service workers cold-start on first message — kick a refresh then too.
+  void refreshWhitelist(false);
 });

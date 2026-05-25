@@ -22,6 +22,12 @@ interface Env {
   // on once the extension's GitHub login ships.
   REQUIRE_AUTH?: string;
   ADMIN_TOKEN?: string; // bearer for the admin moderation endpoints
+  // Wave 12b — fine-grained GitHub PAT scoped to Contents:Write on the
+  // upstream repo, used by the scheduled handler to mirror the curated
+  // whitelist / blacklist to data/*.json. Unset = mirror is disabled and
+  // the cron is a no-op (the public /v1/whitelist endpoint still works).
+  WHITELIST_SYNC_TOKEN?: string;
+  WHITELIST_SYNC_REPO?: string; // "owner/repo", defaults to foru17/make-x-great-again
 }
 
 type Ctx = Context<{ Bindings: Env }>;
@@ -744,4 +750,86 @@ app.get("/admin", (c) => {
   return c.html(adminHtml());
 });
 
-export default app;
+// Wave 12b — scheduled mirror of the curated whitelist/blacklist into the
+// upstream GitHub repo as data/whitelist/v1.json and data/blacklist/v1.json.
+// Bypasses needing to keep the extension hammering /v1/* on every install:
+// users get a CDN-served JSON they can also audit by reading the repo.
+//
+// Disabled (no-op) when WHITELIST_SYNC_TOKEN is unset — the rest of the
+// system works fine without it; this is purely an availability + audit
+// enhancement. Cron trigger in wrangler.toml.
+async function mirrorToGitHub(env: Env): Promise<void> {
+  const token = env.WHITELIST_SYNC_TOKEN;
+  if (!token) return; // PAT not provided yet — mirror disabled.
+  const repo = env.WHITELIST_SYNC_REPO ?? "foru17/make-x-great-again";
+
+  async function publish(path: string, data: unknown): Promise<void> {
+    const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+    // Need SHA of existing file (if any) for the upsert.
+    let sha: string | undefined;
+    const head = await fetch(url, {
+      headers: {
+        authorization: `Bearer ${token}`,
+        "user-agent": "mxga-worker",
+        accept: "application/vnd.github+json",
+      },
+    });
+    if (head.ok) {
+      const j = (await head.json()) as { sha?: string };
+      sha = j.sha;
+    }
+    const body = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2) + "\n")));
+    const put = await fetch(url, {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "user-agent": "mxga-worker",
+        accept: "application/vnd.github+json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        message: `chore(data): sync ${path} from Worker`,
+        content: body,
+        ...(sha ? { sha } : {}),
+      }),
+    });
+    if (!put.ok) {
+      console.warn(`mirror ${path} failed`, put.status, (await put.text()).slice(0, 200));
+    }
+  }
+
+  const wl = await env.DB.prepare(
+    `SELECT x_user_id, handle, last_scored FROM accounts WHERE status='whitelisted' ORDER BY last_scored DESC LIMIT 5000`,
+  ).all<{ x_user_id: string | null; handle: string; last_scored: number }>();
+  const bl = await env.DB.prepare(
+    `SELECT x_user_id, handle, verdict_label, confidence, published_at
+       FROM accounts WHERE status='human_confirmed' AND published_at IS NOT NULL
+       ORDER BY published_at DESC LIMIT 10000`,
+  ).all<{
+    x_user_id: string | null;
+    handle: string;
+    verdict_label: string;
+    confidence: number;
+    published_at: number;
+  }>();
+  const now = Date.now();
+  await publish("data/whitelist/v1.json", {
+    generatedAt: now,
+    count: wl.results?.length ?? 0,
+    list: wl.results ?? [],
+  });
+  await publish("data/blacklist/v1.json", {
+    generatedAt: now,
+    count: bl.results?.length ?? 0,
+    list: bl.results ?? [],
+  });
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): void {
+    ctx.waitUntil(
+      mirrorToGitHub(env).catch((e) => console.warn("mirror error", e)),
+    );
+  },
+};

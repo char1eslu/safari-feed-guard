@@ -43,7 +43,15 @@ database_id = "c3a73f50-9af1-4b85-9b5b-db19dd33f175"
 #   npx wrangler secret put LLM_API_KEY     # bearer token
 #   npx wrangler secret put ADMIN_TOKEN     # /admin gate
 # Optional:
-#   npx wrangler secret put REQUIRE_AUTH    # "1" => /v1/classify requires GH login
+#   npx wrangler secret put REQUIRE_AUTH         # "1" => /v1/classify requires GH login
+#   npx wrangler secret put WHITELIST_SYNC_TOKEN # fine-grained PAT, Contents:Write on the repo
+#   npx wrangler secret put WHITELIST_SYNC_REPO  # "owner/repo", default foru17/make-x-great-again
+
+# Wave 12b — scheduled mirror of curated whitelist/blacklist to the repo.
+# No-ops when WHITELIST_SYNC_TOKEN is unset; otherwise commits to
+# data/whitelist/v1.json and data/blacklist/v1.json every 6h.
+[triggers]
+crons = ["0 */6 * * *"]
 
 # R2 (published bloom/JSON artifact) — phase 2, uncomment when wiring publish:
 # [[r2_buckets]]

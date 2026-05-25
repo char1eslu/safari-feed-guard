@@ -3,6 +3,7 @@ import { BRAND } from "../lib/brand";
 import { onSettingsChange, getSettings } from "../lib/settings";
 import { addBlockRecord, bumpStats } from "../lib/store";
 import { type Cached, cacheGet, cacheSet, signalsHash } from "../lib/cache";
+import { isWhitelisted, loadWhitelistOnce } from "../lib/whitelist-cache";
 import {
   AUTO_THRESHOLD,
   extractFromArticle,
@@ -217,6 +218,9 @@ export default defineContentScript({
     });
 
     await warmBlocklist();
+    // L0a — pull the maintainer whitelist mirror into memory so the gate
+    // check in classify() is synchronous. Cheap (one chrome.storage read).
+    await loadWhitelistOnce();
     const isReplyContext = () => /^\/[^/]+\/status\/\d+/.test(location.pathname);
     const keyOf = (s: Signals) => s.userId || `h:${s.handle}`;
 
@@ -413,6 +417,14 @@ export default defineContentScript({
       // 0. Already blocked → hide, never render/analyze/request again.
       if (isBlockedSync(key) || (sig.userId && isBlockedSync(sig.userId))) {
         hideTweet(anchor);
+        return;
+      }
+
+      // 0a. Maintainer whitelist (Wave 12b L0a) — admin-curated accounts that
+      //     should never be touched by AI. Local mirror is refreshed every
+      //     6h in the bg worker; miss = unknown = fall through normally.
+      if (isWhitelisted(sig.handle, sig.userId)) {
+        badgeFor(anchor, key, sig, null); // looks legit, no badge / no LLM
         return;
       }
 

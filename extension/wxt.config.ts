@@ -23,7 +23,9 @@ export default defineConfig({
       "48": "icon/48.png",
       "128": "icon/128.png",
     },
-    permissions: ["storage"],
+    // `alarms` lets the background worker schedule a 6h whitelist refresh
+    // (Wave 12b L0a cache) without keeping the SW pinned awake.
+    permissions: ["storage", "alarms"],
     host_permissions: [
       // Public Worker entry point (custom domain).
       "https://x.zuoluo.tv/*",

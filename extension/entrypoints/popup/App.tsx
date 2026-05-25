@@ -64,6 +64,7 @@ function Stat({
 export function App() {
   const [status, setStatus] = useState<{ ok: boolean; n: number } | null>(null);
   const [stats, setStats] = useState<LocalStats | null>(null);
+  const [whitelist, setWhitelist] = useState<{ count: number; lastSyncedAt: number } | null>(null);
   const [edgeBase, setEdgeBase] = useState<string>(BRAND.edgeBase);
 
   useEffect(() => {
@@ -72,6 +73,9 @@ export function App() {
     );
     bg<LocalStats>({ type: "stats" }).then((r) => {
       if (r.ok && r.data) setStats(r.data);
+    });
+    bg<{ count: number; lastSyncedAt: number }>({ type: "whitelist_status" }).then((r) => {
+      if (r.ok && r.data) setWhitelist(r.data);
     });
     getSettings().then((s) => {
       if (s.edgeBase) setEdgeBase(s.edgeBase);
@@ -123,6 +127,20 @@ export function App() {
         <Stat label="命中公榜" value={stats?.hitPublic ?? 0} hint="直接拉黑，零成本" accent />
         <Stat label="亲手拉黑" value={stats?.blocked ?? 0} hint="你按的拉黑按钮" />
       </div>
+
+      {whitelist && whitelist.count > 0 ? (
+        <div
+          className="mt-2 flex items-center justify-between rounded-md border border-border bg-card px-3 py-1.5 text-[11px] text-fg-3"
+          title={
+            whitelist.lastSyncedAt
+              ? `最近同步：${new Date(whitelist.lastSyncedAt).toLocaleString("zh-CN", { hour12: false })}`
+              : "尚未同步"
+          }
+        >
+          <span>本地白名单</span>
+          <span className="font-mono text-fg-2 tabular-nums">{fmt(whitelist.count)} 个号 · 每 6h 同步</span>
+        </div>
+      ) : null}
 
       <div
         className={`mt-3 flex items-baseline justify-between gap-2 rounded-md border px-3 py-2 text-xs ${
