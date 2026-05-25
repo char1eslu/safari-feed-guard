@@ -103,6 +103,8 @@ button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
 .btn.primary:hover{opacity:.9}
 .btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 36%,transparent)}
 .btn.danger:hover{background:var(--danger-soft)}
+.btn.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+.btn.ok:hover{background:color-mix(in srgb,var(--ok) 10%,transparent)}
 .btn.sm{padding:5px 10px;font-size:12px;border-radius:var(--r-sm)}
 
 /* Inputs */
@@ -197,7 +199,7 @@ input::placeholder{color:var(--fg-4)}
 .qrow .rep .chip-ok{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;
   border-radius:999px;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);
   background:color-mix(in srgb,var(--ok) 8%,transparent);font-weight:600;font-size:11.5px;letter-spacing:.02em}
-.qrow .acts{display:flex;gap:6px;flex-shrink:0}
+.qrow .acts{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
 
 /* Locked state */
 .locked{min-height:60vh;display:flex;align-items:center;justify-content:center}
@@ -223,8 +225,9 @@ input::placeholder{color:var(--fg-4)}
 .lrow.head:hover{background:var(--card)}
 .lrow .t{color:var(--fg-3);font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
 .lrow .act{font-weight:600;font-size:12px}
-.lrow .act.approve{color:var(--ok)}
-.lrow .act.reject,.lrow .act.remove{color:var(--danger)}
+.lrow .act.approve,.lrow .act.whitelist_add{color:var(--ok)}
+.lrow .act.reject,.lrow .act.remove,.lrow .act.whitelist_remove{color:var(--danger)}
+.lrow .act.whitelist{color:var(--ok)}
 .lrow .actor{color:var(--fg-3);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
 .lrow .h a{color:var(--fg)}.lrow .h a:hover{color:var(--accent)}
 .lrow .n{color:var(--fg-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -259,6 +262,8 @@ const SCRIPT = String.raw`
   var TOK=localStorage.getItem('xss_admin')||'';
   var VIEW='queue';
   var queue=[];
+  var whitelist=[];
+  var wlCursor=null;
   var filter='all';
   var sort='severity';
   var sel=new Set();
@@ -288,6 +293,7 @@ const SCRIPT = String.raw`
       +'</div>'
       +'<div class="tabs">'
       +'<button class="on" data-v="queue" onclick="window.__xss.tab(\'queue\')">待审队列 <span class="count" id="cQ">—</span></button>'
+      +'<button data-v="whitelist" onclick="window.__xss.tab(\'whitelist\')">白名单 <span class="count" id="cW">—</span></button>'
       +'<button data-v="log" onclick="window.__xss.tab(\'log\')">审计日志</button>'
       +'</div>'
       +'<div id="view"></div>';
@@ -412,6 +418,7 @@ const SCRIPT = String.raw`
         +'<div class="rep">'+repHtml+'</div>'
         +'<div class="acts">'
           +'<button class="btn sm primary" data-act="approve">通过</button>'
+          +'<button class="btn sm ok" data-act="whitelist" title="加入白名单，永不再扫">白名单</button>'
           +'<button class="btn sm" data-act="reject">驳回</button>'
           +'<button class="btn sm danger" data-act="remove">移除</button>'
         +'</div>'
@@ -422,7 +429,10 @@ const SCRIPT = String.raw`
       var cb=r.querySelector('input[type=checkbox]');
       cb.addEventListener('change',function(){if(cb.checked){sel.add(k);r.classList.add('sel')}else{sel.delete(k);r.classList.remove('sel')}refreshBatch()});
       Array.prototype.forEach.call(r.querySelectorAll('.acts button'),function(b){
-        b.addEventListener('click',function(){decideOne(r,k,b.dataset.act)})
+        b.addEventListener('click',function(){
+          if(b.dataset.act==='whitelist')whitelistFromQueue(r,k);
+          else decideOne(r,k,b.dataset.act);
+        })
       })
     });
     refreshBatch();
@@ -492,10 +502,111 @@ const SCRIPT = String.raw`
     });
   }
 
+  function loadWhitelist(more){
+    if(!more){whitelist=[];wlCursor=null}
+    setStatus('加载中…');
+    api('/v1/admin/whitelist?limit=100'+(wlCursor?'&before='+wlCursor:'')).then(function(r){
+      if(r.status===403){TOK='';localStorage.removeItem('xss_admin');renderLocked();return null}
+      return r.json();
+    }).then(function(j){
+      if(!j)return;
+      whitelist=whitelist.concat(j.list||[]);
+      wlCursor=j.nextBefore;
+      setStatus('');
+      var c=$('cW');if(c)c.textContent=whitelist.length+(wlCursor?'+':'');
+      renderWhitelist();
+    });
+  }
+  function renderWhitelist(){
+    var v=$('view');
+    v.innerHTML=
+      '<div class="toolbar">'
+        +'<div class="status">共 <b style="color:var(--fg)">'+whitelist.length+'</b> 个白名单账号 · 它们不会再被 AI 扫描，也不接受举报</div>'
+        +'<div class="r">'
+          +'<button class="btn sm primary" onclick="window.__xss.wlAdd()">+ 加入白名单</button>'
+        +'</div>'
+      +'</div>'
+      +'<div class="rows" id="wlrows"></div>'
+      +(wlCursor?'<div style="text-align:center;padding:18px"><button class="btn sm" id="wlmore">加载更多</button></div>':'');
+    var box=$('wlrows');
+    if(!whitelist.length){box.innerHTML='<div class="empty">还没有白名单账号。<br><br>点击右上角 <b>+ 加入白名单</b>，或在「待审队列」对某行点 <b>白名单</b> 按钮把它直接挪过来。</div>';return}
+    box.innerHTML=whitelist.map(function(a){
+      var av=a.avatar_url||('https://unavatar.io/twitter/'+encodeURIComponent(a.handle));
+      var fb=E((a.handle||'?').slice(0,1).toUpperCase());
+      var note='';
+      try{var rs=JSON.parse(a.reasons||'[]');note=Array.isArray(rs)?rs.filter(function(x){return x&&x!=='whitelisted by admin'}).join(' · '):''}catch(e){}
+      return '<div class="qrow legit" data-h="'+E(a.handle)+'" data-u="'+E(a.x_user_id||'')+'">'
+        +'<span></span>'
+        +'<div class="av"><img src="'+E(av)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\''+fb+'\'}))"></div>'
+        +'<div class="who">'
+          +'<div class="name">'+E(a.display_name||('@'+a.handle))+'<span class="vlbl">WHITELISTED</span></div>'
+          +'<div class="sub">'
+            +'<a href="https://x.com/'+E(a.handle)+'" target="_blank" rel="noopener">@'+E(a.handle)+' ↗</a>'
+            +(note?'<span class="sep">·</span><span>'+E(note)+'</span>':'')
+            +'<span class="sep">·</span><span>'+ago(a.last_scored)+'</span>'
+          +'</div>'
+        +'</div>'
+        +'<span></span><span></span>'
+        +'<div class="acts">'
+          +'<button class="btn sm danger" data-wl-rm="1">移出白名单</button>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+    Array.prototype.forEach.call(box.querySelectorAll('.qrow'),function(r){
+      var btn=r.querySelector('[data-wl-rm]');
+      if(btn)btn.addEventListener('click',function(){wlRemove(r.dataset.h,r.dataset.u||null,r)});
+    });
+    var lm=$('wlmore');if(lm)lm.addEventListener('click',function(){loadWhitelist(true)});
+  }
+  function wlAdd(){
+    var h=prompt('要白名单的 @handle（不带 @）：');
+    if(!h)return;
+    h=h.replace(/^@+/,'').trim();
+    if(!h)return;
+    var uid=prompt('（可选）X 数字 user id：','')||'';
+    uid=uid.trim();
+    var note=prompt('备注（可选，比如：核心维护者 / 误判申诉）：','')||'';
+    setStatus('加入白名单…');
+    api('/v1/admin/whitelist',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({handle:h,xUserId:uid||undefined,note:note})
+    }).then(function(r){return r.json()}).then(function(j){
+      if(j&&j.ok){setStatus('已加入');setTimeout(function(){setStatus('')},2000);loadWhitelist(false)}
+      else{setStatus('失败：'+(j&&j.error||'unknown'));setTimeout(function(){setStatus('')},3000)}
+    });
+  }
+  function wlRemove(handle,xUserId,rowEl){
+    if(!confirm('确认把 @'+handle+' 移出白名单？该账号将变回普通可扫描状态（status=rejected）。'))return;
+    rowEl&&rowEl.classList.add('removing');
+    var q='?handle='+encodeURIComponent(handle)+(xUserId?'&xUserId='+encodeURIComponent(xUserId):'');
+    api('/v1/admin/whitelist'+q,{method:'DELETE'}).then(function(){loadWhitelist(false)});
+  }
+  /** Called from queue rows — promotes a queue item to whitelist via /admin/decide. */
+  function whitelistFromQueue(rowEl,k){
+    var parts=k.split('|'),xUserId=parts[0]||undefined,handle=parts[1];
+    if(!confirm('把 @'+handle+' 加入白名单？该账号将永不再被 AI 扫描，举报也会被吞掉。'))return;
+    rowEl.classList.add('removing');
+    api('/v1/admin/decide',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({handle:handle,xUserId:xUserId,action:'whitelist'})})
+      .then(function(){
+        queue=queue.filter(function(a){return key(a)!==k});sel.delete(k);
+        var c=$('cQ');if(c)c.textContent=queue.length;
+        renderRows();
+        // refresh white count silently
+        api('/v1/admin/whitelist?limit=1').then(function(r){return r.json()}).then(function(j){
+          if(!j||!j.list)return;
+          // best-effort hint; full list will load on tab switch
+          var c2=$('cW');if(c2&&c2.textContent==='—')c2.textContent='1+';
+        });
+      });
+  }
+
   function tab(v){
     if(VIEW===v)return;VIEW=v;
     Array.prototype.forEach.call(document.querySelectorAll('.tabs button'),function(b){b.classList.toggle('on',b.dataset.v===v)});
-    if(v==='queue')loadQueue();else loadLog(false);
+    if(v==='queue')loadQueue();
+    else if(v==='whitelist')loadWhitelist(false);
+    else loadLog(false);
   }
   function save(){
     var t=$('t');if(!t)return;
@@ -507,7 +618,7 @@ const SCRIPT = String.raw`
     TOK='';localStorage.removeItem('xss_admin');renderLocked();
   }
 
-  window.__xss={tab:tab,save:save,logout:logout,batch:batch,clearSel:clearSel};
+  window.__xss={tab:tab,save:save,logout:logout,batch:batch,clearSel:clearSel,wlAdd:wlAdd};
   renderShell();
 })();
 `;
