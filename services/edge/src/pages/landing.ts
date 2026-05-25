@@ -159,12 +159,15 @@ section.block h2{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
   display:flex;align-items:center;justify-content:center;color:var(--fg-4);font-size:11.5px;
   font-weight:600;flex-shrink:0}
 .feed-row .av img{width:100%;height:100%;object-fit:cover;display:block}
-.feed-row .h{font-size:13px;font-weight:500;color:var(--fg);overflow:hidden;
+.feed-row .ident{min-width:0;display:flex;align-items:baseline;gap:7px;overflow:hidden}
+.feed-row .display{font-size:13px;font-weight:600;color:var(--fg);overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.005em;min-width:0}
-.feed-row .h a{color:inherit}.feed-row .h a:hover{color:var(--accent)}
+.feed-row .display a{color:inherit}.feed-row .display a:hover{color:var(--accent)}
+.feed-row .handle{font-size:11.5px;color:var(--fg-3);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;flex-shrink:0;max-width:18ch}
 .feed-row .vlbl{display:inline-block;font-size:10px;font-weight:600;color:var(--ec,var(--fg-3));
   text-transform:uppercase;letter-spacing:.06em;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  margin-left:6px}
+  flex-shrink:0}
 .feed-row .pct{font-size:11.5px;color:var(--fg-2);font-variant-numeric:tabular-nums;
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;min-width:32px;text-align:right}
 .feed-row .t{font-size:11.5px;color:var(--fg-3);font-variant-numeric:tabular-nums;
@@ -209,6 +212,8 @@ section.block h2{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
   .feed-row{grid-template-columns:24px 1fr auto auto;gap:8px;padding:9px 14px 9px 16px}
   .feed-row .idx{display:none}
   .feed-row .av{width:24px;height:24px;font-size:10.5px}
+  .feed-row .ident{gap:5px}
+  .feed-row .handle{max-width:14ch;font-size:11px}
   .feed-row .vlbl{display:none}
   .feed-row .x-link{display:none}
 }
@@ -460,10 +465,18 @@ const SCRIPT = `
     var conf=typeof r.confidence==='number'?Math.round(r.confidence*100):0;
     var handleHref='https://x.com/'+encodeURIComponent(r.handle);
     var idxStr='#'+String(typeof idx==='number'?idx:0).padStart(2,'0');
+    var rawName=(r.display_name||'').trim();
+    var display=rawName||('@'+r.handle);
+    var handleLower=String(r.handle||'').toLowerCase();
+    var showHandle=rawName&&rawName.toLowerCase()!==handleLower&&rawName.toLowerCase()!==('@'+handleLower);
     return '<div class="feed-row '+esc(lbl)+(fresh?' new':'')+'" role="listitem">'
       +'<span class="idx">'+idxStr+'</span>'
       +avatarHtml(r)
-      +'<div class="h"><a href="'+handleHref+'" target="_blank" rel="noopener noreferrer">@'+esc(r.handle)+'</a><span class="vlbl">'+esc(lbl)+'</span></div>'
+      +'<div class="ident">'
+        +'<span class="display"><a href="'+handleHref+'" target="_blank" rel="noopener noreferrer">'+esc(display)+'</a></span>'
+        +(showHandle?'<span class="handle">@'+esc(r.handle)+'</span>':'')
+        +'<span class="vlbl">'+esc(lbl)+'</span>'
+      +'</div>'
       +'<span class="pct">'+conf+'%</span>'
       +'<span class="t">'+ago(r.published_at)+'</span>'
       +'<a class="x-link" href="'+handleHref+'" target="_blank" rel="noopener noreferrer" aria-label="去 X 主页">'+EXT_ICON+'</a>'
