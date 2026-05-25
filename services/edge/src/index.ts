@@ -572,6 +572,43 @@ app.get("/v1/admin/whitelist", async (c) => {
   });
 });
 
+// Maintainer view of the public blacklist (status='human_confirmed'). Like
+// /v1/list but admin-scoped (returns more columns + uncacheable) so the
+// /admin panel can iterate it for "moved here by mistake" cleanup.
+app.get("/v1/admin/blacklist", async (c) => {
+  if (!admin(c)) return c.json({ error: "forbidden" }, 403);
+  const before = Number(c.req.query("before")) || null;
+  const limit = Math.min(200, Math.max(1, Number(c.req.query("limit")) || 100));
+  const rows = await c.env.DB.prepare(
+    `SELECT a.x_user_id, a.handle, a.display_name, a.avatar_url,
+            a.verdict_label, a.confidence, a.reasons, a.published_at,
+            (SELECT count(DISTINCT r.reporter_fp) FROM reports r
+              WHERE r.handle=a.handle
+                AND ifnull(r.x_user_id,'')=ifnull(a.x_user_id,'')) reporters
+       FROM accounts a
+      WHERE a.status='human_confirmed'
+        AND (?1 IS NULL OR a.published_at < ?1)
+      ORDER BY a.published_at DESC LIMIT ?2`,
+  )
+    .bind(before, limit)
+    .all<{
+      x_user_id: string | null;
+      handle: string;
+      display_name: string | null;
+      avatar_url: string | null;
+      verdict_label: string;
+      confidence: number;
+      reasons: string;
+      published_at: number;
+      reporters: number;
+    }>();
+  const list = rows.results ?? [];
+  return c.json({
+    list,
+    nextBefore: list.length === limit ? list[list.length - 1].published_at : null,
+  });
+});
+
 // Public read-only mirror for the (future) extension L0a cache. No PII,
 // no avatars — just (handle, xUserId, sinceMs). Cached at the edge.
 app.get("/v1/whitelist", async (c) => {
