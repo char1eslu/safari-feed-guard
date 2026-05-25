@@ -13,7 +13,7 @@ scan(): 收集 ① 资料页头部(若在 profile) ② 所有 article[data-testi
         —— 注意：打开某条推文时，下面的"回复/评论"也是 article[tweet]，
            所以评论区作者本来就在扫描范围内
   ▼
-逐账号 提取信号(被动): 数字userId(头像URL) · handle · 昵称 · 推文/回复正文
+逐账号 提取信号(被动): 数字userId(React/Relay user 数据, profile 页 banner 兜底) · handle · 昵称 · 推文/回复正文
         profile 页额外: bio · 注册时间→天数 · 粉丝/关注 · 是否默认头像
   ▼
 L1 会话内去重: seen Set(按 userId|handle) —— 本页本会话内不重复处理
@@ -51,7 +51,7 @@ CDN bloom 名单优先；新增 上报/申诉/人工复核闸门。
 |---|---|---|---|
 | L0 | **在途去重** pending Map：同账号请求未回前不重复发 | 新增 | 防同页多条回复同时触发同账号 |
 | L1 | 会话内 seen Set | 已有 | 本页不重复 |
-| L2 | **持久账号判定缓存**(chrome.storage/IndexedDB) 按 userId 存 {verdict,signalsHash,ts,model}；spam 判定 TTL 长(30d)，legit/uncertain 短(7d) | **新增（最关键）** | 跨会话/跨推文复现 = 0 次 LLM |
+| L2 | **持久账号判定缓存**(chrome.storage/IndexedDB) 按 userId 或 `h:<handle>` 存 {verdict,signalsHash,ts,model}；spam 判定 TTL 长(30d)，legit/uncertain 短(7d) | **新增（最关键）** | 跨会话/跨推文复现 = 0 次 LLM |
 | L3 | 名单优先 /lookup（未来 CDN bloom） | 已有 | 命中即免 LLM |
 | L4 | 启发式门槛（仅可疑才花 LLM） | 已有 | 干净老号永不计费 |
 | L5 | 服务端 signalsHash 缓存 | 已有 | 同信号不重复；未来跨用户共享 |
@@ -67,6 +67,9 @@ signalsHash 实质变化 ③ 缓存过期 三者同时满足才重判。
 - **未来中心化**：服务端按 userId+signalsHash 去重后，全网"第一个看到新账号
   的人"才付费，其余命中缓存/bloom —— 边际成本趋近 0（与 Cloudflare 成本模型
   一致）。
+- **头像 URL 不作为 userId**：`pbs.twimg.com/profile_images/<number>/...`
+  中的数字是头像资源 ID，不是账号 ID；拿不到真实 `rest_id/id_str` 时必须按
+  handle-only 处理。
 
 ## D. 评论区作者"自动检查"增强方案
 

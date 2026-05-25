@@ -48,17 +48,18 @@ Chrome can only load an unpacked extension through its own UI — it's a
 
 ## Validated against live X (2026-05)
 
-- Numeric `userId` extracted from the avatar URL
-  (`pbs.twimg.com/profile_images/<id>/...`) on the real, current X DOM —
-  the passive id source works without any API.
+- Numeric `userId` comes from X's already-rendered user data (`rest_id` /
+  `id_str`), with profile banner URLs as a profile-page fallback. Avatar URLs
+  are deliberately ignored as an id source because `profile_images/<number>`
+  is an image asset id, not the account id.
 - Full chain with real data: `@elonmusk` → `legit` 0.86 (no false positive);
   porn-bot fixture → `porn_bot` 0.98.
 
 ## Known gaps (tracked)
 
-- If an account uses a default avatar the numeric id can't be resolved; the
-  record is kept handle-keyed with `idResolved: false`. Final key policy is
-  tracked in the data-contract section of [ARCHITECTURE.md](./ARCHITECTURE.md).
+- If the numeric id can't be resolved, the record is kept handle-keyed with
+  `idResolved: false`. Final key policy is tracked in the data-contract section
+  of [ARCHITECTURE.md](./ARCHITECTURE.md).
 - Selectors target the current X DOM and will need maintenance — expected for
   a passive content-script approach.
 - Extension is plain MV3 JS (no build step) to stay runnable for the MVP.

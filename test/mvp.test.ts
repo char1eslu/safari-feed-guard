@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { adaptMvpSignals } from "../src/mvp.ts";
 
-test("numeric userId from the avatar is kept and marked resolved", () => {
+test("numeric userId is kept and marked resolved", () => {
   const { signals, idResolved } = adaptMvpSignals({
-    userId: "2053244804520427520",
+    userId: "44196397",
     handle: "elonmusk",
     displayName: "Elon Musk",
   });
   assert.equal(idResolved, true);
-  assert.equal(signals.userId, "2053244804520427520");
+  assert.equal(signals.userId, "44196397");
 });
 
 test("handle-only gets a deterministic numeric placeholder, idResolved=false", () => {

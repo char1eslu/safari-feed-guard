@@ -37,16 +37,11 @@ function articleOf(node: Element | null): HTMLElement | null {
   return (node?.closest("article") as HTMLElement) ?? null;
 }
 
-/** Find a currently-rendered tweet authored by this account (by numeric id
- *  from the avatar URL, else by the @handle profile link). */
-function findArticleFor(userId?: string, handle?: string): HTMLElement | null {
+/** Find a currently-rendered tweet authored by this account. */
+function findArticleFor(_userId?: string, handle?: string): HTMLElement | null {
   for (const art of document.querySelectorAll<HTMLElement>(
     'article[data-testid="tweet"]',
   )) {
-    if (userId) {
-      const img = art.querySelector<HTMLImageElement>('img[src*="profile_images/"]');
-      if (img?.src.match(/profile_images\/(\d+)\//)?.[1] === userId) return art;
-    }
     if (handle) {
       const nb = art.querySelector('[data-testid="User-Name"]');
       if (

@@ -57,8 +57,22 @@ export function parseCount(text: string | null | undefined): number | undefined 
 
 function avatarInfo(scope: Element | Document) {
   const img = scope.querySelector<HTMLImageElement>('img[src*="profile_images/"]');
-  const m = img?.src.match(/profile_images\/(\d+)\//);
-  return { userId: m?.[1], hasDefaultAvatar: !img, avatarUrl: img?.src };
+  return { hasDefaultAvatar: !img, avatarUrl: img?.src };
+}
+
+function normalizeHandle(handle: string | undefined): string | undefined {
+  return handle?.trim().replace(/^@+/, "").toLowerCase() || undefined;
+}
+
+function numericId(v: unknown): string | undefined {
+  return typeof v === "string" && /^\d+$/.test(v) ? v : undefined;
+}
+
+function bannerUserId(scope: Element | Document): string | undefined {
+  const el = scope.querySelector<HTMLElement>('[src*="profile_banners/"], [style*="profile_banners/"]');
+  const raw =
+    el instanceof HTMLImageElement ? el.src : (el?.getAttribute("style") ?? "");
+  return numericId(raw.match(/profile_banners\/(\d+)\//)?.[1]);
 }
 
 export interface FiberUser {
@@ -76,17 +90,22 @@ export interface FiberUser {
  * passive. Best-effort: if X's internals change we return {} and fall back to
  * the visible signals (no regression).
  */
-const fiberCache = new WeakMap<Element, FiberUser>();
+const fiberCache = new WeakMap<Element, Map<string, FiberUser>>();
 
-export function readFiberUser(el: Element): FiberUser {
-  const hit = fiberCache.get(el);
+export function readFiberUser(el: Element, handle?: string): FiberUser {
+  const cacheKey = normalizeHandle(handle) ?? "";
+  const hit = fiberCache.get(el)?.get(cacheKey);
   if (hit) return hit;
-  const out = readFiberUserUncached(el);
-  fiberCache.set(el, out);
+  const out = readFiberUserUncached(el, cacheKey || undefined);
+  if (Object.keys(out).length) {
+    const byHandle = fiberCache.get(el) ?? new Map<string, FiberUser>();
+    byHandle.set(cacheKey, out);
+    fiberCache.set(el, byHandle);
+  }
   return out;
 }
 
-function readFiberUserUncached(el: Element): FiberUser {
+function readFiberUserUncached(el: Element, expectedHandle?: string): FiberUser {
   try {
     const fk = Object.keys(el).find((k) => k.startsWith("__reactFiber$"));
     if (!fk) return {};
@@ -96,7 +115,7 @@ function readFiberUserUncached(el: Element): FiberUser {
     const budget = { n: 4000 }; // hard cap: never let the walk hang the page
     for (let i = 0; node && i < 24; i++) {
       for (const bag of [node.memoizedProps, node.memoizedState]) {
-        const u = findUser(bag, seen, 0, budget);
+        const u = findUser(bag, seen, 0, budget, expectedHandle);
         if (u) {
           const legacy = u.legacy ?? u;
           const created = legacy.created_at
@@ -104,7 +123,7 @@ function readFiberUserUncached(el: Element): FiberUser {
             : NaN;
           return {
             bio: typeof legacy.description === "string" ? legacy.description : "",
-            userId: u.rest_id ?? legacy.id_str,
+            userId: numericId(u.rest_id) ?? numericId(legacy.id_str),
             followersCount: legacy.followers_count,
             followingCount: legacy.friends_count,
             accountAgeDays: Number.isNaN(created)
@@ -122,7 +141,13 @@ function readFiberUserUncached(el: Element): FiberUser {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: deep search over React internals
-function findUser(o: any, seen: Set<unknown>, depth: number, b: { n: number }): any {
+function findUser(
+  o: any,
+  seen: Set<unknown>,
+  depth: number,
+  b: { n: number },
+  expectedHandle?: string,
+): any {
   if (!o || typeof o !== "object" || depth > 5 || seen.has(o)) return null;
   if (--b.n <= 0) return null; // global work budget — cannot hang the page
   if (o instanceof Node || o instanceof Window) return null; // skip DOM/window
@@ -135,10 +160,11 @@ function findUser(o: any, seen: Set<unknown>, depth: number, b: { n: number }): 
       typeof legacy.description === "string" &&
       ("followers_count" in legacy || "screen_name" in legacy)
     ) {
-      return o;
+      const screenName = normalizeHandle(legacy.screen_name);
+      if (!expectedHandle || screenName === expectedHandle) return o;
     }
     for (const k of Object.keys(o)) {
-      const r = findUser(o[k], seen, depth + 1, b);
+      const r = findUser(o[k], seen, depth + 1, b, expectedHandle);
       if (r) return r;
     }
   } catch {
@@ -171,7 +197,10 @@ export function extractProfile(): Signals | null {
   }
   const scope =
     document.querySelector('[data-testid="primaryColumn"]') ?? document;
-  const { userId, hasDefaultAvatar, avatarUrl } = avatarInfo(scope);
+  const { hasDefaultAvatar, avatarUrl } = avatarInfo(scope);
+  const profileScope = scope instanceof Element ? scope : nameEl;
+  const fu = readFiberUser(profileScope, handle);
+  const userId = fu.userId ?? bannerUserId(scope);
 
   return {
     isProfile: true,
@@ -205,7 +234,7 @@ function isPromoted(article: HTMLElement): boolean {
 
 export function extractFromArticle(article: HTMLElement): Signals | null {
   if (isPromoted(article)) return null; // official X ad → not spam
-  const { userId, hasDefaultAvatar, avatarUrl } = avatarInfo(article);
+  const { hasDefaultAvatar, avatarUrl } = avatarInfo(article);
   const nameBlock = article.querySelector<HTMLElement>('[data-testid="User-Name"]');
   if (!nameBlock) return null;
   let handle: string | undefined;
@@ -225,7 +254,7 @@ export function extractFromArticle(article: HTMLElement): Signals | null {
   const tweetText = tweetEl ? tweetEl.innerText.trim() : "";
   // Pull the author's already-loaded profile (bio/counts/age) from X's React
   // data — automatic, no hover, zero extra requests.
-  const fu = readFiberUser(article);
+  const fu = readFiberUser(article, handle);
   return {
     isProfile: false,
     handle,
@@ -234,7 +263,7 @@ export function extractFromArticle(article: HTMLElement): Signals | null {
     hasDefaultAvatar,
     recentTweets: tweetText ? [tweetText] : [],
     ...(avatarUrl ? { avatarUrl } : {}),
-    ...(userId || fu.userId ? { userId: userId ?? fu.userId } : {}),
+    ...(fu.userId ? { userId: fu.userId } : {}),
     ...(tweetText ? { triggeringComment: tweetText } : {}),
     ...(fu.accountAgeDays !== undefined ? { accountAgeDays: fu.accountAgeDays } : {}),
     ...(fu.followersCount !== undefined ? { followersCount: fu.followersCount } : {}),
