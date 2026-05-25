@@ -101,11 +101,11 @@ const ICON_EXT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
 const SHELL = `
 <section class="head">
-  <h1>公榜 · 最近 100 个</h1>
-  <p class="lede" style="font-size:12.5px;color:var(--fg-3);margin-bottom:14px;text-transform:uppercase;letter-spacing:.12em">${BRAND.acronym} · 自动拦垃圾</p>
-  <p class="lede">下面的 X 账号都满足：AI 高置信判定 <strong>且</strong> 至少 3 个独立 GitHub 用户标过。除 X 公开的数字 ID 外，一字段不存。</p>
-  <p class="lede">认为是误判？开 <a href="${BRAND.appealNewIssue}" style="color:var(--accent)">一个 issue</a>，维护者会人工复核；无承诺 SLA，通常一两天内回应。</p>
-  <div class="pulse"><span class="dot" aria-hidden="true"></span><span id="pulseLabel">连接中…</span></div>
+  <h1>公开名单</h1>
+  <p class="lede" style="font-size:12.5px;color:var(--fg-3);margin-bottom:14px;text-transform:uppercase;letter-spacing:.12em">${BRAND.acronym} · 已确认的垃圾号</p>
+  <p class="lede">最近公开确认的账号。AI 先打分，再由维护者人工过一遍。</p>
+  <p class="lede">误伤了？开 <a href="${BRAND.appealNewIssue}" style="color:var(--accent)">一个 issue</a>，复核后会撤下，必要时加白名单。</p>
+  <div class="pulse"><span class="dot" aria-hidden="true"></span><span id="pulseLabel">连接中...</span></div>
 </section>
 
 <div class="aggr">
@@ -115,7 +115,7 @@ const SHELL = `
   <div class="c"><div class="n" id="agLatest">—</div><div class="l">最近一条</div></div>
 </div>
 
-<div class="list" id="list" role="list"><div class="empty">加载中…</div></div>
+<div class="list" id="list" role="list"><div class="empty">加载中...</div></div>
 
 <div class="more"><button class="btn sm" id="moreBtn" hidden>加载更早 100 条</button></div>
 
@@ -157,7 +157,7 @@ const SCRIPT = `
         +'</div>'
       +'</div>'
       +'<div class="right">'
-        +'<div class="conf" title="AI confidence">'
+        +'<div class="conf" title="模型置信度">'
           +'<span class="pct">'+conf+'%</span>'
           +'<div class="bar"><i style="width:'+conf+'%"></i></div>'
         +'</div>'
@@ -166,7 +166,7 @@ const SCRIPT = `
       +'</div>';
   }
   function render(){
-    if(!rows.length){listEl.innerHTML='<div class="empty">还没有已确认条目。它会随着用户使用慢慢长出来。</div>';return}
+    if(!rows.length){listEl.innerHTML='<div class="empty">暂时还没有公开条目。</div>';return}
     listEl.innerHTML=rows.map(function(r){return rowHtml(r,!1)}).join('');
   }
   function refreshAggr(meta){
@@ -187,7 +187,7 @@ const SCRIPT = `
   }
   function loadMore(){
     if(exhausted||!oldestAt)return;
-    moreBtn.disabled=!0;moreBtn.textContent='加载中…';
+    moreBtn.disabled=!0;moreBtn.textContent='加载中...';
     fetch('/v1/list?limit=100&before='+oldestAt).then(function(r){return r.json()}).then(function(j){
       var seen=Object.create(null);rows.forEach(function(r){seen[key(r)]=1});
       (j.list||[]).forEach(function(r){if(!seen[key(r)])rows.push(r)});
@@ -200,17 +200,17 @@ const SCRIPT = `
     fetch('/v1/list?limit=100&since='+latestAt).then(function(r){return r.json()}).then(function(j){
       lastPollAt=Date.now();
       var fresh=j.list||[];
-      if(!fresh.length){setPulse('无新增 · '+ago(lastPollAt));return}
+      if(!fresh.length){setPulse('暂时没有新增 · '+ago(lastPollAt));return}
       var seen=Object.create(null);rows.forEach(function(r){seen[key(r)]=1});
-      var added=fresh.filter(function(r){return !seen[key(r)]});if(!added.length){setPulse('无新增 · '+ago(lastPollAt));return}
+      var added=fresh.filter(function(r){return !seen[key(r)]});if(!added.length){setPulse('暂时没有新增 · '+ago(lastPollAt));return}
       rows=added.concat(rows);latestAt=j.latestAt||latestAt;
       var frag=document.createDocumentFragment();
       added.forEach(function(r){
         var div=document.createElement('div');div.innerHTML=rowHtml(r,!reduced);frag.appendChild(div.firstElementChild);
       });
       listEl.insertBefore(frag,listEl.firstChild);
-      setPulse('<strong>+'+added.length+' 新条目</strong> · '+ago(lastPollAt));
-    }).catch(function(){setPulse('网络错误 · '+ago(lastPollAt))})
+      setPulse('<strong>+'+added.length+' 个新条目</strong> · '+ago(lastPollAt));
+    }).catch(function(){setPulse('网络不太顺 · '+ago(lastPollAt))})
   }
   function refreshMeta(){fetch('/v1/list/meta').then(function(r){return r.json()}).then(refreshAggr).catch(function(){})}
   moreBtn.addEventListener('click',loadMore);
@@ -223,7 +223,7 @@ const SCRIPT = `
 
 export function listHtml(): string {
   return layout({
-    title: `公开 spam 榜单 · ${BRAND.acronym}`,
+    title: `公开名单 · ${BRAND.acronym}`,
     current: "list",
     css: CSS,
     head: `<meta name="robots" content="noindex,follow">`,

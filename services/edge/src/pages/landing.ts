@@ -10,16 +10,19 @@ const CSS = `
    in the eyebrow chip to anchor "this is for X" instantly.
    .hero-row is the outer flex container with the mascot on the right;
    .hero is the text column (text/eyebrow/h1/lede/CTAs/meta/install-note). */
-.hero-row{display:flex;align-items:center;gap:36px;padding:64px 0 28px;max-width:none}
-.hero{flex:1;min-width:0;padding:0;max-width:620px}
-.hero-mascot{flex-shrink:0;width:340px;display:flex;align-items:center;justify-content:center;
+.hero-row{display:grid;grid-template-columns:minmax(0,1fr) 360px;align-items:start;gap:48px;
+  padding:56px 0 34px;max-width:none}
+.hero{min-width:0;padding:0;max-width:680px}
+.hero-side{display:flex;flex-direction:column;align-items:center;gap:18px;min-width:0}
+.hero-mascot{width:320px;display:flex;align-items:center;justify-content:center;
   animation:bird-bob 4s ease-in-out infinite;transform-origin:50% 100%}
 .hero-mascot img{width:100%;height:auto;display:block;
   filter:drop-shadow(0 18px 32px rgba(29,161,242,.18)) drop-shadow(0 4px 10px rgba(0,0,0,.08))}
 @keyframes bird-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 @media (max-width:920px){
-  .hero-row{flex-direction:column;align-items:flex-start;gap:8px;padding:48px 0 24px}
-  .hero-mascot{width:240px;align-self:center;order:-1;margin-bottom:-12px}
+  .hero-row{grid-template-columns:1fr;gap:24px;padding:44px 0 28px}
+  .hero-mascot{width:220px}
+  .hero-side{align-items:stretch}
 }
 @media (prefers-reduced-motion:reduce){.hero-mascot{animation:none}}
 .hero .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:600;
@@ -40,7 +43,7 @@ const CSS = `
   margin:0 .04em;color:var(--fg)}
 .hero h1 .xmark svg{width:100%;height:100%}
 .hero .eyebrow .x svg{width:100%;height:100%}
-.hero .lede{font-size:17px;color:var(--fg-2);max-width:620px;margin-bottom:32px;
+.hero .lede{font-size:17px;color:var(--fg-2);max-width:560px;margin-bottom:28px;
   line-height:1.65;letter-spacing:-.005em}
 .hero .ctas{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px}
 .hero .meta{font-size:12.5px;color:var(--fg-4);display:flex;flex-wrap:wrap;
@@ -83,20 +86,22 @@ section.block h2{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
 .trust .row h3{font-size:14px;font-weight:600;margin-bottom:5px;color:var(--fg);letter-spacing:-.005em}
 .trust .row p{font-size:13px;line-height:1.6;color:var(--fg-3)}
 
-/* Stats */
+/* First-screen stats */
+.hero-stats{width:100%;max-width:380px}
+.hero-stats .stats-foot{justify-content:center}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);
   border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
-.stat{padding:24px 24px 22px;background:var(--bg)}
-.stat .n{font-size:36px;font-weight:600;letter-spacing:-.025em;font-variant-numeric:tabular-nums;
+.stat{padding:16px 14px 15px;background:var(--bg);min-width:0}
+.stat .n{font-size:25px;font-weight:600;letter-spacing:-.025em;font-variant-numeric:tabular-nums;
   line-height:1.05;color:var(--fg);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.stat .n.skel{display:inline-block;width:64px;height:38px;background:linear-gradient(90deg,
+.stat .skel{display:inline-block;width:46px;height:26px;background:linear-gradient(90deg,
   var(--card),var(--card-hi),var(--card));
   background-size:200% 100%;animation:shim 1.4s ease-in-out infinite;border-radius:var(--r-sm);vertical-align:middle}
 @keyframes shim{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.stat .lbl{font-size:12px;color:var(--fg-3);margin-top:10px;letter-spacing:.01em}
+.stat .lbl{font-size:11px;color:var(--fg-3);margin-top:8px;letter-spacing:.01em;white-space:nowrap}
 .stat .n.bump{animation:bump .55s cubic-bezier(.34,1.56,.64,1)}
 @keyframes bump{0%{transform:scale(1)}38%{transform:scale(1.08)}100%{transform:scale(1)}}
-.stats-foot{margin-top:18px;font-size:12.5px;color:var(--fg-3);display:flex;
+.stats-foot{margin-top:12px;font-size:12px;color:var(--fg-3);display:flex;
   align-items:center;gap:10px;flex-wrap:wrap}
 .stats-foot a{color:var(--fg)}.stats-foot a:hover{color:var(--accent)}
 .stats-foot .pip{display:inline-flex;align-items:center;gap:6px}
@@ -105,7 +110,7 @@ section.block h2{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
 
 /* FEED block — sits directly under hero, no big section header.
    feed-head is a quiet eyebrow + "see all" link, then the feed itself. */
-.feed-block{padding:8px 0 32px;max-width:820px}
+.feed-block{padding:4px 0 48px;max-width:none}
 .feed-head{display:flex;align-items:center;justify-content:space-between;gap:14px;
   margin-bottom:12px;padding:0 2px}
 .feed-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;
@@ -196,7 +201,7 @@ section.block h2{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
   align-items:center;gap:10px;flex-wrap:wrap;padding:0 2px}
 .feed-foot strong{color:var(--fg);font-weight:600;font-variant-numeric:tabular-nums}
 .feed-foot a{color:var(--fg)}.feed-foot a:hover{color:var(--accent)}
-.feed-skel{padding:60px 20px;text-align:center;color:var(--fg-3);font-size:12.5px}
+.feed-skel{padding:30px 20px;text-align:center;color:var(--fg-3);font-size:12.5px}
 
 @media (max-width:560px){
   .feed-row{grid-template-columns:24px 1fr auto auto;gap:8px;padding:9px 14px 9px 16px}
@@ -218,13 +223,17 @@ section.block h2{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--fg)}
 
 @media (max-width:760px){
-  .hero{padding:64px 0 48px}
+  .hero{padding:0}
   .hero h1{font-size:40px;letter-spacing:-.03em}
   .pillar{grid-template-columns:1fr;gap:8px;padding:20px}
   .pillar .n{font-size:11px}
   .pillar .status{align-self:flex-start;margin-top:4px}
   .trust{grid-template-columns:1fr}
-  .stats{grid-template-columns:1fr}
+  .hero-stats{max-width:none}
+  .stats{grid-template-columns:repeat(3,1fr)}
+  .stat{padding:14px 10px}
+  .stat .n{font-size:22px}
+  .stat .lbl{font-size:10.5px}
   section.block{padding:48px 0}
 }
 @media (max-width:440px){
@@ -240,83 +249,99 @@ const ICON_LOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICON_DB = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>`;
 const ICON_USER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
 
+const HERO_STATS = `
+<div class="hero-stats" aria-label="当前运行数据">
+  <div class="stats">
+    <div class="stat"><div class="n" id="sCount" data-v="0"><span class="skel"></span></div><div class="lbl">已确认</div></div>
+    <div class="stat"><div class="n" id="sWeek" data-v="0"><span class="skel"></span></div><div class="lbl">本周新增</div></div>
+    <div class="stat"><div class="n" id="sPending" data-v="0"><span class="skel"></span></div><div class="lbl">待复核</div></div>
+  </div>
+  <p class="stats-foot">
+    <span class="pip"><i aria-hidden="true"></i><span id="sAgo">每分钟同步</span></span>
+  </p>
+</div>
+`;
+
 const HERO = `
 <section class="hero-row">
 <div class="hero">
   <span class="eyebrow">
     <span class="dot" aria-hidden="true"></span>
     <span class="x">${ICONS.X}</span>
-    为 X 设计<span class="sep">·</span>开源 ${BRAND.license}
+    Chrome 扩展<span class="sep">·</span>${BRAND.license} 开源
   </span>
-  <h1>Make <span class="xmark">${ICONS.X}</span> Great Again<br><span class="sub">让 X 重新能好好刷。</span></h1>
-  <p class="lede">AI 帮你挑出广告号、色情 bot 和水军，一键真拉黑——驱动 X 自己的屏蔽接口，不是隐藏。</p>
+  <h1>Make <span class="xmark">${ICONS.X}</span> Great Again<br><span class="sub">少看垃圾，多看人话。</span></h1>
+  <p class="lede">广告号、色情引流先标出；拉黑由你确认。</p>
   <div class="ctas">
-    <a class="btn primary" href="${LINKS.RELEASE_URL}" id="installBtn" aria-label="免费装到 Chrome">${ICON_DOWNLOAD}<span>免费装到 Chrome</span></a>
-    <a class="btn" href="${BRAND.repo}" aria-label="在 GitHub 上查看源码">${ICON_GH}<span>查看源码</span></a>
-    <a class="btn" href="/list" aria-label="看公榜">${ICON_LIST}<span>看公榜</span></a>
+    <a class="btn primary" href="${LINKS.RELEASE_URL}" id="installBtn" aria-label="下载扩展">${ICON_DOWNLOAD}<span>下载扩展</span></a>
+    <a class="btn" href="${BRAND.repo}" aria-label="在 GitHub 上查看源码">${ICON_GH}<span>看源码</span></a>
+    <a class="btn" href="/list" aria-label="看公开名单">${ICON_LIST}<span>看公开名单</span></a>
   </div>
   <p class="meta">
-    <span>不存身份信息</span><span class="dot" aria-hidden="true"></span>
-    <span>不用注册</span><span class="dot" aria-hidden="true"></span>
-    <span>源码全开</span>
+    <span>手动拉黑</span><span class="dot" aria-hidden="true"></span>
+    <span>不存身份</span><span class="dot" aria-hidden="true"></span>
+    <span>开源</span>
   </p>
   <div class="install-note" id="installNote" role="status">
-    <strong>开发者模式手装</strong>（商店审核中，先这样用）：
+    <strong>商店审核中，先手动安装</strong>：
     <ol>
-      <li>下载并解压最新 <code>.zip</code></li>
-      <li>浏览器地址栏输 <code>chrome://extensions</code>，右上角打开「开发者模式」</li>
-      <li>点「加载已解压的扩展程序」，选刚解压的目录</li>
-      <li>打开 x.com，扩展自动开始干活</li>
+      <li>下载解压最新 <code>.zip</code></li>
+      <li>打开 <code>chrome://extensions</code>，开启「开发者模式」</li>
+      <li>点「加载已解压的扩展程序」</li>
+      <li>打开 x.com 就能用</li>
     </ol>
   </div>
 </div>
-<div class="hero-mascot" aria-hidden="true">
-  <img src="/mxga-hero.png" alt="" width="340" height="340" />
+<div class="hero-side">
+  <div class="hero-mascot" aria-hidden="true">
+    <img src="/mxga-hero.png" alt="" width="340" height="340" />
+  </div>
+  ${HERO_STATS}
 </div>
 </section>
 `;
 
 const PILLARS = `
 <section class="block">
-  <h2>装上之后，它在你刷 X 时悄悄做这 5 件事</h2>
+  <h2>先救评论区，再做深</h2>
   <div class="pillars">
     <div class="pillar">
       <div class="n">01</div>
       <div class="body">
-        <h3>自动拦垃圾</h3>
-        <p>评论区的色情号、广告号被自动识别，内联打标，一键真·拉黑（直接点 X 自带的屏蔽按钮，多端同步）。3 个独立 GitHub 用户都标过的会进公榜，所有人共享。</p>
+        <h3>拦垃圾评论</h3>
+        <p>标出广告、色情引流和模板回复。你确认后再拉黑。</p>
       </div>
       <span class="status live">● 已上线</span>
     </div>
     <div class="pillar">
       <div class="n">02</div>
       <div class="body">
-        <h3>一秒识水军</h3>
-        <p>鼠标移到任何 @handle 上，弹小卡片：注册多久、原创多少、聊什么、谁在和他互动。一眼看清是真号、营销号还是蹭流量的。</p>
+        <h3>识别账号</h3>
+        <p>计划显示账号年龄、常聊话题和互动质量。</p>
       </div>
       <span class="status next">下一站</span>
     </div>
     <div class="pillar">
       <div class="n">03</div>
       <div class="body">
-        <h3>历史一键看</h3>
-        <p>打开任何人的主页，侧栏自动展开：他平时主要在聊什么、本月最热的几条、什么时段最活跃。关不关注，30 秒看完决定。</p>
+        <h3>速览主页</h3>
+        <p>计划总结主题、高赞内容和活跃时间。</p>
       </div>
       <span class="status soon">规划中</span>
     </div>
     <div class="pillar">
       <div class="n">04</div>
       <div class="body">
-        <h3>看清谁在带节奏</h3>
-        <p>刷推时如果有「你关注的 3 个人转过」「真实传播范围」会自动提示。让重要的内容能穿过算法直达你眼前。</p>
+        <h3>看清传播</h3>
+        <p>计划显示你关注的人是否转评过。</p>
       </div>
       <span class="status soon">规划中</span>
     </div>
     <div class="pillar">
       <div class="n">05</div>
       <div class="body">
-        <h3>数据随时带走</h3>
-        <p>你自己的关注、收藏、推文，一键存成 JSON 或 Markdown。整个过程在浏览器里完成，一字节不上传。</p>
+        <h3>导出数据</h3>
+        <p>计划导出关注、收藏和自己的推文。</p>
       </div>
       <span class="status soon">规划中</span>
     </div>
@@ -326,12 +351,12 @@ const PILLARS = `
 
 const TRUST = `
 <section class="block">
-  <h2>开源透明，四项保证</h2>
+  <h2>规则公开，误伤可撤</h2>
   <div class="trust">
-    <div class="row" style="--ic:#10b981"><span class="ic">${ICON_SHIELD}</span><div><h3>AI 不能单独「定罪」</h3><p>任何账号进公榜，必须有人工审核 或 至少 3 个独立 GitHub 用户都标过。这条规则直接写在数据库里，改不了，不靠承诺。</p></div></div>
-    <div class="row" style="--ic:#38bdf8"><span class="ic">${ICON_LOCK}</span><div><h3>不存任何身份信息</h3><p>服务端只存 X 的公开数字 ID + 举报人的 GitHub 数字 ID。你的浏览历史、关注列表、Cookie，一字节都不上传。</p></div></div>
-    <div class="row" style="--ic:#f59e0b"><span class="ic">${ICON_DB}</span><div><h3>每一条决策可查</h3><p>谁、什么时候、对哪个账号做了什么操作，全在 review_log 里。改主意了？删除有完整轨迹，不偷偷消失。</p></div></div>
-    <div class="row" style="--ic:#a855f7"><span class="ic">${ICON_USER}</span><div><h3>上报需 GitHub 登录</h3><p>用 GitHub Device Flow，扫码即可。反刷分、反恶意举报。不强迫你单独注册账号。</p></div></div>
+    <div class="row" style="--ic:#10b981"><span class="ic">${ICON_SHIELD}</span><div><h3>模型不定案</h3><p>模型只给理由；进名单要人工确认或多人上报。</p></div></div>
+    <div class="row" style="--ic:#38bdf8"><span class="ic">${ICON_LOCK}</span><div><h3>不碰登录态</h3><p>不上传 Cookie、关注列表和浏览历史。</p></div></div>
+    <div class="row" style="--ic:#f59e0b"><span class="ic">${ICON_DB}</span><div><h3>操作留痕</h3><p>加入、移除、白名单、驳回都有记录。</p></div></div>
+    <div class="row" style="--ic:#a855f7"><span class="ic">${ICON_USER}</span><div><h3>GitHub 上报</h3><p>登录只用于防刷和追溯提交。</p></div></div>
   </div>
 </section>
 `;
@@ -342,30 +367,14 @@ const TRUST = `
 const FEED = `
 <section class="feed-block">
   <div class="feed-head">
-    <span class="feed-eyebrow"><i class="live-dot" aria-hidden="true"></i>实时拦下<span class="sep">·</span>20s 同步</span>
-    <a class="feed-more" href="/list">完整公榜 →</a>
+    <span class="feed-eyebrow"><i class="live-dot" aria-hidden="true"></i>最近处理<span class="sep">·</span>20 秒更新</span>
+    <a class="feed-more" href="/list">完整名单 →</a>
   </div>
-  <div class="feed" id="feed" role="list"><div class="feed-skel">连接中…</div></div>
+  <div class="feed" id="feed" role="list"><div class="feed-skel">连接中...</div></div>
   <p class="feed-foot">
-    <span id="feedAgo">连接中…</span>
+    <span id="feedAgo">连接中...</span>
     <span class="sep">·</span>
-    <span>本次访问看到 <strong id="feedAdded">0</strong> 条新增</span>
-  </p>
-</section>
-`;
-
-const STATS = `
-<section class="block">
-  <h2>正在跑的数据，不是 PPT</h2>
-  <div class="stats">
-    <div class="stat"><div class="n" id="sCount" data-v="0"><span class="skel"></span></div><div class="lbl">已确认的垃圾 / 色情号</div></div>
-    <div class="stat"><div class="n" id="sWeek" data-v="0"><span class="skel"></span></div><div class="lbl">本周新增</div></div>
-    <div class="stat"><div class="n" id="sPending" data-v="0"><span class="skel"></span></div><div class="lbl">排队等人工复核</div></div>
-  </div>
-  <p class="stats-foot">
-    <span class="pip"><i aria-hidden="true"></i><span id="sAgo">60 秒同步一次</span></span>
-    <span class="sep">·</span>
-    <a href="/list">完整公榜 →</a>
+    <span>本页新增 <strong id="feedAdded">0</strong> 条</span>
   </p>
 </section>
 `;
@@ -406,7 +415,7 @@ const SCRIPT = `
       countTo(document.getElementById('sCount'),j.count,650);
       countTo(document.getElementById('sWeek'),(j.week>0?'+':'')+j.week,650);
       countTo(document.getElementById('sPending'),j.pending,650);
-      document.getElementById('sAgo').textContent=j.generatedAt?('刚刚同步 '+agoLong(j.generatedAt)):'60 秒同步一次'
+      document.getElementById('sAgo').textContent=j.generatedAt?('刚刚同步 '+agoLong(j.generatedAt)):'每分钟同步'
     }).catch(function(){
       ['sCount','sWeek','sPending'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent='—'})
     })
@@ -447,7 +456,7 @@ const SCRIPT = `
   }
 
   function renderInitial(){
-    if(!rows.length){feedEl.innerHTML='<div class="feed-skel">还没有已确认条目。它会随用户使用慢慢长出来。</div>';return}
+    if(!rows.length){feedEl.innerHTML='<div class="feed-skel">暂时还没有公开条目。</div>';return}
     // initial render — no "new" flash, just appear
     feedEl.innerHTML=rows.map(function(r,i){return rowHtml(r,false,i+1)}).join('');
   }
@@ -458,9 +467,9 @@ const SCRIPT = `
       latestAt=j.latestAt;
       lastPollAt=Date.now();
       renderInitial();
-      feedAgo.textContent='已同步 · 共 '+rows.length+' 条';
+      feedAgo.textContent='已同步 '+rows.length+' 条';
     }).catch(function(){
-      feedEl.innerHTML='<div class="feed-skel">连接失败 · 30s 后重试</div>';
+      feedEl.innerHTML='<div class="feed-skel">连接失败，稍后重试</div>';
     })
   }
 
@@ -469,7 +478,7 @@ const SCRIPT = `
     fetch('/v1/list?limit=6&since='+latestAt).then(function(r){return r.json()}).then(function(j){
       lastPollAt=Date.now();
       var fresh=(j.list||[]).filter(function(r){return !rows.some(function(x){return key(x)===key(r)})});
-      if(!fresh.length){feedAgo.textContent='无新增 · '+agoLong(lastPollAt);return}
+      if(!fresh.length){feedAgo.textContent='暂时没有新增 · '+agoLong(lastPollAt);return}
       // Prepend new rows (newest first, animated). Cap at 10 total.
       var added=fresh.slice(0,6);
       latestAt=j.latestAt||latestAt;
@@ -487,8 +496,8 @@ const SCRIPT = `
       rows=added.concat(rows).slice(0,6);
       Array.prototype.forEach.call(feedEl.querySelectorAll('.feed-row .idx'),
         function(el,i){el.textContent='#'+String(i+1).padStart(2,'0')});
-      feedAgo.innerHTML='<strong>+'+added.length+' 新</strong> · '+agoLong(lastPollAt);
-    }).catch(function(){feedAgo.textContent='网络错误 · '+agoLong(lastPollAt)})
+      feedAgo.innerHTML='<strong>+'+added.length+' 个新条目</strong> · '+agoLong(lastPollAt);
+    }).catch(function(){feedAgo.textContent='网络不太顺 · '+agoLong(lastPollAt)})
   }
 
   // ---- Boot ----
@@ -506,8 +515,8 @@ export function landingHtml(): string {
     title: `${BRAND.name} · ${BRAND.tagline}`,
     current: "home",
     css: CSS,
-    head: `<meta name="description" content="${BRAND.name} — 一个被动的 X(Twitter) 旁路扩展：Spam 净化 + KOL 信号分 + 摘要 + 社交图谱。开源 ${BRAND.license}，不收集 PII。">`,
-    body: HERO + FEED + PILLARS + TRUST + STATS,
+    head: `<meta name="description" content="MXGA 是开源 X 扩展：标出广告号和色情引流号，拉黑前由你确认；公开名单可查，误伤可申诉。">`,
+    body: HERO + FEED + PILLARS + TRUST,
     script: SCRIPT,
   });
 }

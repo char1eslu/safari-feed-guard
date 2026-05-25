@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-  <b>AI 帮你拦 X 上的垃圾。</b><br>
-  让 X 重新能好好刷 · 开源 AGPL-3.0
+  <b>少看垃圾，多看人话。</b><br>
+  你照常刷 X，AI 在后台把广告号和色情 bot 挑出来 · Chrome 扩展 · AGPL-3.0 开源
 </p>
 
 <p align="center">

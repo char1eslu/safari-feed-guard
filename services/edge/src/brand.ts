@@ -10,7 +10,7 @@ export const BRAND = {
   /** Short acronym for compact surfaces (badges, popup header, doc cross-refs). */
   acronym: "MXGA",
   /** Single-line positioning. Native Chinese phrasing, no translation tang. */
-  tagline: "AI 帮你拦 X 上的垃圾",
+  tagline: "少看垃圾，多看人话",
   /** Public GitHub repo URL (no trailing slash). */
   repo: "https://github.com/foru17/make-x-great-again",
   /** Latest GitHub Release page (auto-redirects to newest assets). */
