@@ -9,7 +9,7 @@ extra requests to X, no action taken on your account.
 你刷 X  →  扩展 content-script 读到可见账号(被动)
               │  你点「🛡 检查」按钮  (POST 127.0.0.1:8787/classify)
               ▼
-        本地服务 (T3 分类器 + 策展库 + /lookup 黑名单查询)
+        本地服务 (分类器 + 策展库 + /lookup 黑名单查询)
               │  verdict
               ▼
         扩展内联渲染：⚠️徽标 + 悬浮理由 + [隐藏]（仅本页折叠，不操作账号）
@@ -58,7 +58,7 @@ Chrome can only load an unpacked extension through its own UI — it's a
 
 - If an account uses a default avatar the numeric id can't be resolved; the
   record is kept handle-keyed with `idResolved: false`. Final key policy is
-  owned by T1 (LUO-16).
+  tracked in the data-contract section of [ARCHITECTURE.md](./ARCHITECTURE.md).
 - Selectors target the current X DOM and will need maintenance — expected for
   a passive content-script approach.
 - Extension is plain MV3 JS (no build step) to stay runnable for the MVP.

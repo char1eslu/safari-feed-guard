@@ -1,7 +1,7 @@
 # UX & interaction design
 
-Status: **proposed**. Goal: turn the crude MVP extension into a polished,
-non-intrusive product that sits tastefully on top of X's dark UI.
+Design notes for turning the extension into a polished, non-intrusive product
+that sits tastefully on top of X's dark UI.
 
 ## 0. Requirement synthesis (梳理)
 
@@ -138,5 +138,4 @@ findings = brand-tinted. (Designed as SVG → PNG, not emoji.)
 ## 8. Scope / next step
 
 This doc is the design. Implementation is a separate, sizeable step
-(WXT migration + Shadow-DOM UI rebuild) — proposed under T2 (LUO-17),
-pending the maintainer's go-ahead on the questions raised in the thread.
+(WXT migration + Shadow-DOM UI rebuild).

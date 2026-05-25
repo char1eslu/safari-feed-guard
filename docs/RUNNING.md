@@ -1,8 +1,9 @@
-# Running locally (T3 classifier spike)
+# Running locally (classifier spike)
 
-This is the first runnable slice of [T3](https://github.com/foru17/x-spam-sentinel)
-— the local LLM classifier + private append-only curation store. The browser
-extension采集 (DOM ingestion) and the public list publishing are separate tracks.
+A small CLI in `src/` that runs the same LLM prompt the production Worker
+uses, against a local SQLite append-only store. Useful for prompt iteration
+and debugging — the browser extension and the public list publishing are
+separate code paths and don't need this to run.
 
 ## Setup
 
@@ -34,8 +35,8 @@ displayName, bio, up to ~10 recent tweets, and the triggering comment.
   never viewpoints; prefers `uncertain` over a false accusation.
 - Stores every verdict in `.curation-db/records.jsonl` (gitignored) as
   **`auto_pending_review`**. Governance red-line: an AI verdict is **never
-  auto-public**. A human-review gate (later track) promotes records before
-  anything reaches the public sharded list.
+  auto-public**. Public listing requires the review path described in
+  [GOVERNANCE.md](../GOVERNANCE.md).
 - Caches by `userId + signalsHash` so re-runs don't re-bill the model.
 
 ## Checks
@@ -44,4 +45,5 @@ displayName, bio, up to ~10 recent tweets, and the triggering comment.
 pnpm typecheck && pnpm test && pnpm lint
 ```
 
-Schemas here are provisional — the final data contract is owned by T1 (LUO-16).
+Schemas here are provisional — production data contract lives in
+[`services/edge/schema.sql`](../services/edge/schema.sql).

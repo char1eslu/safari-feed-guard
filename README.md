@@ -149,19 +149,19 @@ CONTRIBUTING.md       贡献指南
 
 ## 当前进度
 
-按 Wave 推进，一个 Wave 一段 1–3 天的小冲刺。
+**v0.2.0**（已上线）
+- 浏览器扩展（Chrome MV3）— 被动 AI 识别 + 一键真拉黑
+- 公开服务端 — `x.zuoluo.tv` / `/list` 公榜 / `/admin` 审核台
+- 维护者白名单 + 黑名单的 6h 自动同步到仓库 [`data/`](./data) 目录
+- 公榜每条带 `evidence_text`（触发推文片段）+ `reasons`（AI 给出的理由）+ `reporters`（独立举报人数）
 
-| Wave | 内容 | 状态 |
-|---|---|:---:|
-| 1–7 | MVP → WXT 重构 → Cloudflare 上线 → 审核台 → 公榜 → base-ui 视觉系统 | ✅ |
-| 8 | rebrand 为 Make X Great Again，从 spam 单点扩成 5 支柱平台 | ✅ |
-| 9 | 小蓝 mascot 接入 + 导航图标 + 公榜实时滚动 | ✅ |
-| 10 | 队列降噪：客户端老号短路（>730d）+ 服务端 legit-cache | ✅ |
-| 11 | 维护者白名单 + GH 账号 ≥90d 才计入自动公榜 | ✅ |
-| 12 | 审核台中文化 + 黑名单 tab + 自定义弹窗 + 扩展端 L0a 白名单本地缓存（每 6h 同步）+ 仓库镜像 cron | ✅ |
-| 13+ | Pillar 02–05 启动（KOL 信号分 / profile 摘要 / 社交图谱 / 数据导出）| 🚧 |
+**接下来想做的（02–05）**
+- 鼠标 hover @handle → KOL 信号分浮卡
+- 进 profile 自动出"主要谈什么 / 最热几条 / 最佳互动时段"摘要
+- 看推文时显示"你关注的 N 人转过 / 评论过"
+- 一键导出你的关注 / 收藏 / 推文为 JSON / Markdown
 
-最近一份 as-built 审计在 [docs/STATUS.md](./docs/STATUS.md)。
+完整 release notes：[GitHub Releases](https://github.com/foru17/make-x-great-again/releases)
 
 ## 治理与隐私
 

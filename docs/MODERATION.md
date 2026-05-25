@@ -1,11 +1,11 @@
 # Trust tiers, GitHub-gated reporting & admin moderation
 
-Status: **proposed** (design + feasibility). Extends GOVERNANCE.md and the
-Cloudflare architecture. No code yet.
+Public moderation design notes. This extends [GOVERNANCE.md](../GOVERNANCE.md)
+and the Cloudflare architecture.
 
 ## Why (threat model)
 
-Today every install can hit the Worker freely:
+The moderation design protects three high-risk surfaces:
 
 1. **LLM-cost abuse** — `/v1/classify` holds the server LLM key; anyone can
    burn it.
@@ -35,7 +35,7 @@ LLM classification is no longer a free anonymous endpoint.
   `reporter = gh:<id>` (no PII beyond a GitHub id), rate-limits/bans per id.
 - `/v1/report` & `/v1/confirm` require a valid GitHub identity → `401`
   otherwise. `/v1/check` stays anonymous.
-- Cost: a free GitHub OAuth App. Effort: **Low–Medium.**
+- Cost: a free GitHub OAuth App.
 
 ## Report → AI → auto / queue → admin (the gatekeeper pipeline)
 
@@ -54,14 +54,13 @@ GitHub-verified report → D1 reports(pending)
         ▼  Admin panel: approve → public · reject → dropped · remove → unpublish
 ```
 
-### Governance reconciliation (must flag)
+### Governance reconciliation
 
-GOVERNANCE.md currently says *AI verdict never auto-public; needs human
-gate*. The user wants clear-cut spam auto-processed. Compromise that keeps
-the red line intact: **the human signal = K independent GitHub-verified
-reporters.** AI-high-confidence **plus** real corroborating humans → auto.
-AI alone never auto-publishes. Everything borderline → admin. (K is a
-policy knob, default e.g. 3.)
+GOVERNANCE.md says an AI verdict is never enough by itself. The policy line is:
+**the human signal = K independent GitHub-verified reporters or a maintainer
+review.** AI-high-confidence plus real corroborating humans may be promoted by
+policy, while AI alone never auto-publishes. Borderline cases stay in the
+admin queue.
 
 ## Admin moderation panel (守门员)
 
@@ -69,24 +68,22 @@ policy knob, default e.g. 3.)
   maintainer GitHub-login allowlist (or Cloudflare Access).
 - Queue view: account + AI verdict/confidence + evidence (signals snapshot)
   + #reporters; actions **通过 / 驳回 / 移除**, writes `review_log`.
-- D1 already has `accounts`, `reports`, `review_log`. Add: `reports.reporter`
-  = gh id; `accounts.status` transitions; admin endpoints; allowlist.
-- Effort: **Medium** (UI is small; reuses the panel design system).
+- D1 stores `accounts`, `reports`, `review_log`; status transitions and admin
+  endpoints keep the public list auditable.
 
-## Feasibility summary
+## Implementation summary
 
-| Piece | Effort | Notes |
-|---|---|---|
-| GitHub Device-Flow auth (ext) + Worker verify | Low–Med | standard |
-| Gate `/v1/report` `/v1/confirm` by GitHub id | Low | header check |
-| Protect `/v1/classify` from anonymous abuse | **decision** | see below |
-| Report→AI re-score + auto/queue rule | Med | Worker + D1 |
-| Admin moderation panel + admin auth | Med | new Worker routes + small UI |
+| Piece | Notes |
+|---|---|
+| GitHub Device-Flow auth (ext) + Worker verify | Standard browser-extension login path |
+| Gate `/v1/report` `/v1/confirm` by GitHub id | Prevents anonymous report abuse |
+| Protect `/v1/classify` from anonymous abuse | Keeps LLM cost bounded |
+| Report→AI re-score + review queue | Worker + D1 |
+| Admin moderation panel + admin auth | Maintainer-only review surface |
 
-All on the **existing Cloudflare stack — no new infra.** This is a coherent,
-buildable evolution of the current design.
+All on the existing Cloudflare stack.
 
-## Decisions (locked by owner)
+## Current policy
 
 1. **`/v1/classify` = GitHub-authed only.** Anonymous installs get
    read-only public list (`/v1/check`) + local heuristic + local cache.

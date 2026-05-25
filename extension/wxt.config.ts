@@ -15,10 +15,8 @@ export default defineConfig({
   // WXT still watches + hot-reloads it.
   webExt: { disabled: true },
   manifest: ({ mode }) => ({
-    // Brand-forward name. Owner accepted the (small) reviewer risk of the
-    // "Make X Great Again" phrasing in exchange for a stronger product
-    // identity. CWS_LISTING.md surfaces the trade-off in case the listing
-    // ever gets rejected and we want to fall back to "MXGA — X spam shield".
+    // Brand-forward name. CWS_LISTING.md keeps the fallback copy in case the
+    // listing needs a more neutral store-facing title.
     name: "Make X Great Again",
     // Single-purpose description — what's shipped today, plus the framing
     // that anchors the brand: AI-driven, ambient, privacy-first.
@@ -37,7 +35,7 @@ export default defineConfig({
       "128": "icon/128.png",
     },
     // `alarms` lets the background worker schedule a 6h whitelist refresh
-    // (Wave 12b L0a cache) without keeping the SW pinned awake.
+    // (local L0a cache) without keeping the SW pinned awake.
     permissions: ["storage", "alarms"],
     host_permissions: [
       // Public Worker entry point (custom domain).

@@ -7,8 +7,8 @@ import { AccountSignals } from "./schema.ts";
  * The extension extracts the X **numeric user id** from the avatar image URL
  * (`pbs.twimg.com/profile_images/<numericId>/...`) — a passive, DOM-available
  * source, no scraping. If the avatar is a default/empty one the id can't be
- * resolved; we still accept the account but mark `idResolved: false` so a
- * later track can decide how to handle handle-only records.
+ * resolved; we still accept the account but mark `idResolved: false` so the
+ * review/publish pipeline can handle handle-only records explicitly.
  */
 export const MvpSignals = z.object({
   userId: z.string().regex(/^\d+$/).optional(),

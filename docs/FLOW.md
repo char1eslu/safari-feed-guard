@@ -1,8 +1,7 @@
 # Product flow (as-built) + de-dup / cost strategy
 
-Status: current local MVP reality + proposed cost-control design. The
-Cloudflare future-state is in [ARCHITECTURE.md](./ARCHITECTURE.md); this
-doc is about how it actually works *today* and how to stop wasting LLM calls.
+Current flow notes for MXGA's detection pipeline and LLM cost controls.
+Cloudflare deployment details live in [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## A. Current end-to-end flow (what runs today)
 
@@ -37,7 +36,7 @@ L4 启发式预筛(本地零成本): 默认头像/新号/低粉/导流话术/可
 未来（已设计未实现）：localhost 服务 → Cloudflare Workers+D1+R2；扩展改为
 CDN bloom 名单优先；新增 上报/申诉/人工复核闸门。
 
-## B. 当前的缺口（你提的问题）
+## B. 当前缺口
 
 1. **评论区作者**技术上已被扫描（同样是 `article[tweet]`），但只有启发式
    ≥0.5 才自动判；很多回复型 spam 账号信号较隐蔽 → 落到"手动按钮"，体验上

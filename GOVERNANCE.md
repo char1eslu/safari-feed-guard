@@ -1,10 +1,9 @@
 # Governance
 
-x-spam-sentinel publishes a list that effectively **accuses real accounts**
-of being spam/abuse bots. That power is dangerous if misused. These rules are
-non-negotiable and bind the code, the service, and the published data. The
-final, detailed policy is owned by track T1 (LUO-16); this is the contract it
-must satisfy.
+Make X Great Again (MXGA) publishes a list that effectively **accuses real
+accounts** of being spam/abuse bots. That power is dangerous if misused.
+These rules are non-negotiable and bind the code, the service, and the
+published data.
 
 ## Scope
 

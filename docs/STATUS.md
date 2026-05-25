@@ -1,7 +1,7 @@
-# Project status — as-built audit (2026-05-19)
+# Project status
 
-Honest snapshot of what actually exists, its dependencies, and the debt —
-the input for the next planning round. Not aspirational.
+Public snapshot of what exists today, what it depends on, and what still
+needs hardening.
 
 ## 1. One-liner
 
@@ -39,14 +39,14 @@ toolchain** for the classifier.
 
 | 组件 | 作用 | 栈 | 状态 |
 |---|---|---|---|
-| `extension/` | 消费端 MV3 扩展（检测/拉黑/面板/登录） | WXT, vanilla TS, Shadow DOM | 可用，主功能在 PR#7 |
+| `extension/` | 消费端 MV3 扩展（检测/拉黑/面板/登录） | WXT, React, Shadow DOM | 可用 |
 | `services/edge/` | 边缘 API + D1 + /admin | Hono, Zod, Wrangler | **已部署**线上 |
 | `src/` | 本地分类器/CLI/旧 localhost 服务 | tsx, Zod, node:test | 早期，部分被 edge 取代 |
 | `docs/` | ARCHITECTURE/UX/FLOW/PRODUCT/MODERATION/MVP/RUNNING/STATUS | — | 较全 |
 
 ## 4. 依赖
 
-**内部技术栈**：WXT 0.20 · Hono 4 · Zod 3 · TypeScript 5 · tsx · Biome ·
+**技术栈**：WXT 0.20 · Hono 4 · Zod 3 · TypeScript 5 · tsx · Biome ·
 Wrangler 4 · @cloudflare/workers-types · @types/chrome。
 
 **外部服务依赖（关键，含风险）**：
@@ -54,7 +54,7 @@ Wrangler 4 · @cloudflare/workers-types · @types/chrome。
 | 依赖 | 用途 | 风险 |
 |---|---|---|
 | **LLM 推理（外部 OpenAI 兼容供应商）** | 服务端分类 | 第三方、单点、经常性成本；`LLM_API_BASE` / `LLM_API_MODEL` / `LLM_API_KEY` 全部 Worker secret，**不入仓** |
-| **Cloudflare**（Workers + D1） | 边缘服务 / 数据库 | 个人账号，bus-factor 风险 |
+| **Cloudflare**（Workers + D1） | 边缘服务 / 数据库 | 平台依赖，需要备份和交接预案 |
 | **GitHub OAuth App** | 上报 / 分类鉴权 | client_id 公开常量；REQUIRE_AUTH 开启后强依赖 |
 | **X 内部接口/DOM** | 真·拉黑 + 页面解析 | `blocks/create.json`+不可伪造 transaction-id→只能 DOM 驱动；X 改版即坏，**最脆环节** |
 | **unavatar.io** | 审核台老数据头像兜底 | 第三方，仅维护者侧、非关键 |
@@ -71,44 +71,31 @@ Wrangler 4 · @cloudflare/workers-types · @types/chrome。
 
 ## 6. 部署/运行现状
 
-- Worker 已部署，对外通过自定义域 `https://x.zuoluo.tv`（个人 CF 账号）；
+- Worker 已部署，对外通过自定义域 `https://x.zuoluo.tv`；
   历史 URL `*.workers.dev` 仍可用作 fallback。
   Secrets：`LLM_API_BASE` / `LLM_API_MODEL` / `LLM_API_KEY` / `ADMIN_TOKEN`。
-- **`REQUIRE_AUTH` 仍 = 关**（匿名仍可调用 /v1/classify → LLM 成本暴露未关闭）。
+- GitHub 登录用于上报和防滥用计数；上线前后需要持续确认鉴权和限流配置。
 - 审核台：`/admin`（ADMIN_TOKEN 进入）。
-- 扩展加载：`extension/.output/chrome-mv3`（生产构建，方案 B：改完 `wxt
-  build`、用户点重载）。
+- 扩展通过 release zip 或 Chrome Web Store 版本分发。
 
 ## 7. 安全/治理姿态
 
 信任分层（匿名只读 / GitHub 上报 / 维护者审核）；AI 单独永不自动公开，
-人工信号=≥3 独立 GitHub 上报人或管理员；除公开数字 ID 外无 PII。**红线已成文
-(GOVERNANCE/MODERATION) 且服务端逻辑就位，但强制开关未开。**
+人工信号=≥3 独立 GitHub 上报人或管理员；除公开数字 ID 外无 PII。相关红线已在
+[GOVERNANCE.md](../GOVERNANCE.md) 和 [MODERATION.md](./MODERATION.md) 成文。
 
-## 8. Multica & PR
+## 8. 已知缺口 / 技术债 / 风险
 
-- Epic LUO-15；T1(LUO-16,todo,**未正式定稿**)、T2(17,ip)、T3(18,ip)、
-  T4(19,backlog,**未做**)、T5(20,ip,已部署)、T6(22,backlog,核心已实现)、
-  R1(21,backlog,竞品调研未做)。
-- main = `9f235d2`（早期 6PR 合并）。**PR#7 巨大且未合并**：真·拉黑、面板、
-  T6 服务端、/admin、拉黑队列、动效、登录全在里面。
-
-## 9. 已知缺口 / 技术债 / 风险
-
-1. **PR#7 体量过大、未并 main** —— 分支债重现，审查/回滚困难。
-2. **T1 治理/schema 从未正式定稿** —— D1 schema 一路 ad-hoc 演进。
-3. **T4 未做** —— 仍走 `/v1/check` 逐 id 查；ARCHITECTURE 设计的 R2
-   bloom-first 低成本/可缓存模型尚未落地，规模化成本/性能未兑现。
-4. **分类器逻辑双份**：`src/llm.ts` 与 `services/edge` 各一套 SYSTEM 提示，
+1. **数据契约仍需收敛** —— D1 schema、公开快照字段、申诉流程需要保持一致。
+2. **Bloom-first 模型未落地** —— 仍走 `/v1/check` 逐 id 查；
+   [ARCHITECTURE.md](./ARCHITECTURE.md) 设计的低成本/可缓存模型尚未落地。
+3. **分类器逻辑双份**：`src/llm.ts` 与 `services/edge` 各一套 SYSTEM 提示，
    易漂移（已发生过需两处同改）。
-5. **无 CI / 扩展与 edge 无测试**：只有 `src/` 早期 node:test。
-6. **REQUIRE_AUTH 关**：匿名 LLM 成本暴露未闭合（等验收后 flip）。
-7. **X DOM/接口脆弱**：选择器与拉黑流程随 X 改版会坏，需持续维护。
-8. **CF 在个人账号**：所有权/可持续性（bus-factor）。
-9. ADMIN_TOKEN 为单一静态密钥（无每人身份/轮换）。
+4. **无 CI / 扩展与 edge 无测试**：只有 `src/` 早期 node:test。
+5. **X DOM/接口脆弱**：选择器与拉黑流程随 X 改版会坏，需持续维护。
+6. **管理端鉴权较轻**：当前以维护者密钥保护，后续可升级到多人身份和轮换机制。
 
-## 10. 留给规划的开放杠杆（不在此决策）
+## 9. 后续杠杆
 
-合并并清理 PR#7 → 正式定稿 T1（含统一 schema + 消除分类器双份）→
-是否做 T4(R2 bloom) → REQUIRE_AUTH 上线时机 → CF 账号是否迁 org →
-CI/测试基线 → R1 竞品调研。
+收敛数据契约（含统一 schema + 消除分类器双份）→ 发布 Bloom/快照 artifact →
+补齐 CI/测试基线 → 强化管理端鉴权与运维交接。

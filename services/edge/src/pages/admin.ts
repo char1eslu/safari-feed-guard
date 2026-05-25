@@ -198,8 +198,8 @@ input::placeholder{color:var(--fg-4)}
   line-height:1.45;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;
   -webkit-line-clamp:2;-webkit-box-orient:vertical;max-width:560px}
 /* Confidence cell — single line: big % colored by verdict severity.
-   We removed the fat bar (Wave 12c feedback: it left a blank-looking
-   rectangle below the % in light mode). Conf% IS the entire signal. */
+   We removed an earlier fat bar (it left a blank-looking rectangle below
+   the % in light mode). Conf% IS the entire signal. */
 .qrow .conf{display:flex;align-items:baseline;gap:6px;min-width:80px;justify-content:flex-start}
 .qrow .conf .pct{font-size:18px;color:var(--ec,var(--fg));font-weight:700;font-variant-numeric:tabular-nums;
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1;letter-spacing:-.01em}

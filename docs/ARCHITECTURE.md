@@ -1,7 +1,8 @@
 # Architecture — Cloudflare-native public service
 
-Status: **proposed** (planning). Final data contract & governance policy are
-owned by track T1 (LUO-16). This document is the input to that finalization.
+Architecture notes for MXGA — the Chrome extension + Cloudflare service
+that ships the public spam-shield. Read alongside [GOVERNANCE.md](../GOVERNANCE.md)
+for the policy contract this implementation must satisfy.
 
 ## Goal
 
@@ -107,9 +108,9 @@ Cloudflare R2/CDN has **zero egress fees**.
 - **publications** — `version_tag`, `generated_at`, `count`, `r2_key`,
   optional `git_sha`.
 
-Key policy (for T1): `x_user_id` is the immutable key; `@handle` is mutable
-and never a key. Default-avatar spam accounts often expose no numeric id —
-kept handle-keyed with `id_resolved=false` until resolved.
+Key policy: `x_user_id` is the immutable key; `@handle` is mutable and never
+a primary key. Default-avatar spam accounts often expose no numeric id, so
+they are kept handle-keyed with `id_resolved=false` until resolved.
 
 ## Public API (Workers, versioned, anonymous read)
 
@@ -153,12 +154,12 @@ light read + cron + static-artifact workload.
 > *new* suspicious accounts (deduped + gated), independent of user count and
 > of the infra choice. An owned server can optionally run LLM batch jobs.
 
-## Track mapping (Multica)
+## Component map
 
-| Track | Scope under this design |
+| Component | Scope |
 |---|---|
-| T1 (LUO-16) | Finalize D1 schema, API contract, report-abuse & appeal policy, key policy |
-| T2 (LUO-17) | Extension: CDN bloom-first checks, per-page count popup, one-click block/report |
-| T3 (LUO-18) | Classification pipeline (LLM + review gate), runs on Workers |
-| T4 (LUO-19) | Cron publish job → R2 artifact (+ optional GitHub mirror) + CDN |
-| T5 (LUO-20) | Cloudflare service: Workers API + D1 + R2 + Cron + Pages (no self-host) |
+| Data contract | D1 schema + API surface + report-abuse / appeal policy |
+| Extension | CDN-first checks, per-page badge bubble, one-click block/report |
+| Classifier | LLM + human-review gate, runs on Workers |
+| Publish pipeline | Cron mirror → `data/*.json` in this repo + CDN |
+| Service plane | Workers API + D1 + Cron + SSR pages (no self-host) |

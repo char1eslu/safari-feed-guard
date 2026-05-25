@@ -21,8 +21,6 @@ async function set(k: string, v: string): Promise<void> {
 // client secret; this ships in every OAuth client by design). A build
 // constant, never a user-facing setting.
 //
-// 2026-05-25 — migrated from the onenorthlab company OAuth App to a personal
-// foru17 app so the project stays consistent with the personal hosting.
 export const GH_CLIENT_ID = "Ov23liP2AbdNePTyKUEA";
 
 // When the compiled-in client_id changes (e.g. after an app migration), any

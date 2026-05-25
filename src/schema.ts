@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 /**
- * Provisional schemas — final data contract is owned by T1 (LUO-16).
+ * Provisional schemas for the local classifier spike.
+ * Production data contract lives in `services/edge/schema.sql`.
  * The immutable key is the X numeric user id; @handle is mutable and never
  * used as a key.
  */
@@ -41,8 +42,8 @@ export type Verdict = z.infer<typeof Verdict>;
 
 /**
  * Append-only curation record. Governance red-line: an AI verdict is NEVER
- * auto-public. Everything lands as `auto_pending_review` until a human gate
- * (handled by a later track) promotes it.
+ * auto-public. Everything lands as `auto_pending_review` until the review
+ * pipeline promotes it.
  */
 export const ReviewStatus = z.enum(["auto_pending_review", "human_confirmed", "human_rejected"]);
 export type ReviewStatus = z.infer<typeof ReviewStatus>;

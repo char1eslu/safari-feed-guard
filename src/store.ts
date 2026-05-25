@@ -4,8 +4,8 @@ import { type CurationRecord, CurationRecord as CurationRecordSchema } from "./s
 
 /**
  * Append-only JSONL local curation store — the private source of truth.
- * Never published as-is; a later track applies the human-review gate before
- * anything reaches the public sharded list.
+ * Never published as-is; the public list is produced only after the
+ * human-review gate.
  */
 const DB_PATH = process.env.CURATION_DB_PATH ?? ".curation-db/records.jsonl";
 

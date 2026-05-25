@@ -14,4 +14,4 @@
 - [ ] 不削弱 GOVERNANCE.md 红线（无自动公开 / 范围 / 申诉 / 隐私 / 被动姿态）
 
 ## 关联 Issue
-<!-- [LUO-XX](mention://issue/<uuid>) -->
+<!-- Closes #123 / Related #123 -->

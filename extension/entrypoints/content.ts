@@ -460,7 +460,7 @@ export default defineContentScript({
         return;
       }
 
-      // 0a. Maintainer whitelist (Wave 12b L0a) — admin-curated accounts that
+      // 0a. Maintainer whitelist (L0a) — admin-curated accounts that
       //     should never be touched by AI. Local mirror is refreshed every
       //     6h in the bg worker; miss = unknown = fall through normally.
       //     UX: source="whitelist" makes the badge a visible green ✓
@@ -500,7 +500,7 @@ export default defineContentScript({
       //        with no promo language are short-circuited as likely-legit
       //        WITHOUT spending an LLM call. This is the core fix for the
       //        admin queue being flooded with established accounts that
-      //        happened to appear in reply zones (LUO-32 / Wave 11).
+      //        happened to appear in reply zones.
       if (inflight.has(key)) return;
       const h = heuristic(sig);
       // Implicit trust: account > 2y old AND heuristic finds nothing
@@ -627,7 +627,7 @@ export default defineContentScript({
       clearTimeout(t);
       t = setTimeout(scan, 600);
     }).observe(document.documentElement, { childList: true, subtree: true });
-    // Periodic tick so the pending backlog drains as tokens refill, even
+    // Periodic tick so the pending queue drains as tokens refill, even
     // when the user stops scrolling (no new DOM mutations).
     setInterval(scan, 4000);
     scan();

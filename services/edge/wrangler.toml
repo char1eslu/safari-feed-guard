@@ -2,7 +2,7 @@ name = "x-spam-sentinel-edge"
 main = "src/index.ts"
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
-# Personal Cloudflare account, pinned because the auth has multiple accounts.
+# Cloudflare account for the public Worker deployment.
 account_id = "cfab318ffd80d3f933cb6742534e88f3"
 
 # Custom domain — public entry point. Requires the parent zone (`zuoluo.tv`)
@@ -47,7 +47,7 @@ database_id = "c3a73f50-9af1-4b85-9b5b-db19dd33f175"
 #   npx wrangler secret put WHITELIST_SYNC_TOKEN # fine-grained PAT, Contents:Write on the repo
 #   npx wrangler secret put WHITELIST_SYNC_REPO  # "owner/repo", default foru17/make-x-great-again
 
-# Wave 12b — scheduled mirror of curated whitelist/blacklist to the repo.
+# Scheduled mirror of curated whitelist/blacklist to the repo.
 # No-ops when WHITELIST_SYNC_TOKEN is unset; otherwise commits to
 # data/whitelist/v1.json and data/blacklist/v1.json every 6h.
 [triggers]

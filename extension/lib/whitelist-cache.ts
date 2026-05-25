@@ -105,7 +105,9 @@ export async function refreshWhitelist(force = false): Promise<{
         added++;
       }
     }
-    cursor = j?.latestAt ?? list[list.length - 1].last_scored;
+    const last = list[list.length - 1];
+    if (!last) break;
+    cursor = j?.latestAt ?? last.last_scored;
     if (list.length < 2000) break; // last page
   }
   const next: State = { cursor, lastSyncedAt: Date.now(), entries: merged };

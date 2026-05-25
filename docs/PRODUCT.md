@@ -1,28 +1,26 @@
 # Product direction & management panel
 
-Status: **proposed** (this-phase scope below). Reframes the tool from a
-single "block helper" into a product.
+Public product notes for shaping MXGA beyond a single "block helper".
 
 ## From feature → product
 
-x-spam-sentinel = **an X anti-spam + (later) account-reputation extension**,
+MXGA = **an X anti-spam + (later) account-reputation extension**,
 three pillars:
 
 1. **Protect** *(built, working)* — passive detection, inline badges,
    bottom-right bubble, one-click block, blocklist short-circuit, local
    verdict cache / de-dup.
-2. **Manage** *(this phase)* — a management panel: overview, blocklist
+2. **Manage** *(active)* — a management panel: overview, blocklist
    records, detection-cache browser, settings, about/license.
-3. **Reputation** *(deferred — placeholder only, no backlog build)* —
-   crowdsourced account scoring / aggregated takes on big accounts. Noted
-   so the data model doesn't paint us into a corner; **not** this phase.
+3. **Reputation** *(future)* — crowdsourced account scoring / aggregated
+   takes on big accounts. This is kept as a direction note so the data model
+   does not paint the project into a corner.
 
-## This phase: the management panel
+## Management panel
 
 **Surface:** the extension **Options page** (full browser tab — room for a
 data-dense panel). The toolbar popup stays a lightweight status chip with an
-"打开管理面板" entry. (Side-panel / popup-expand are alternatives — see the
-open decision.)
+"打开管理面板" entry.
 
 **IA (left nav):**
 
@@ -34,7 +32,7 @@ open decision.)
 | 设置 Settings | 自动阈值 · 每页 LLM 预算 · 气泡开关/位置 · 回复区自动检测开关 · LLM endpoint/model · 数据保留 TTL · 清空数据 | — |
 | 关于 About(版权页) | 名称/版本 · AGPL-3.0 · 治理摘要+链接(GOVERNANCE.md) · 隐私声明(除公开数字 ID 外不存 PII) · 误判申诉入口 · 仓库/反馈链接 · 致谢 | — |
 
-## Required data-model change (the real "拓展")
+## Data-model notes
 
 Today's storage is too thin for a useful panel — upgrade (backward-safe):
 
@@ -59,7 +57,7 @@ Lucide SVG icons. The panel is the full-page member of the **same** system
 `prefers-reduced-motion`, no emoji icons). Consistency over novelty — no new
 font (skill suggested Fira; we keep system-ui for cohesion with the in-page UI).
 
-## Phasing
+## Delivery slices
 
 - **P0** Overview + Blocklist + About (minimal usable loop; needs the
   data-model upgrade + a shared `lib/store.ts`).

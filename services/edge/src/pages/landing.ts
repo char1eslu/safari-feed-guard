@@ -1,6 +1,5 @@
-// Product landing — public, zero-PII. Make X Great Again — passive
-// ambient extension that makes X usable: 5 pillars, only Pillar 1 (Spam
-// Shield) is shipped today; the rest are tagged Coming soon.
+// Product landing — public, zero-PII. MXGA — the passive Chrome extension
+// that identifies spam / porn-ad bots on X and hands you a one-click block.
 // Visual: base-ui inspired — monochrome canvas, type-led hierarchy.
 import { BRAND } from "../brand";
 import { ICONS, LINKS, layout } from "./_layout";
@@ -55,7 +54,7 @@ section.block{padding:64px 0;border-top:1px solid var(--border)}
 section.block h2{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
   color:var(--fg-3);font-weight:600;margin-bottom:32px}
 
-/* 5 Pillars — vertical stack of large cells, each labeled */
+/* Pillars — vertical stack of large cells, each labeled */
 .pillars{display:grid;grid-template-columns:1fr;gap:1px;background:var(--border);
   border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
 .pillar{display:grid;grid-template-columns:80px 1fr auto;gap:20px;padding:24px 28px;

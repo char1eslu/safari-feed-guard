@@ -17,15 +17,14 @@ interface Env {
   LLM_API_BASE: string;
   LLM_API_MODEL: string;
   LLM_API_KEY: string;
-  // "1" => enforce GitHub auth on classify/report/confirm. Default off so
-  // deploying T6 doesn't break the still-anonymous shipped extension; flip
-  // on once the extension's GitHub login ships.
+  // "1" => enforce GitHub auth on classify/report/confirm. Keep this in sync
+  // with the currently shipped extension's login flow.
   REQUIRE_AUTH?: string;
   ADMIN_TOKEN?: string; // bearer for the admin moderation endpoints
-  // Wave 12b — fine-grained GitHub PAT scoped to Contents:Write on the
-  // upstream repo, used by the scheduled handler to mirror the curated
-  // whitelist / blacklist to data/*.json. Unset = mirror is disabled and
-  // the cron is a no-op (the public /v1/whitelist endpoint still works).
+  // Fine-grained GitHub PAT scoped to Contents:Write on the upstream repo,
+  // used by the scheduled handler to mirror the curated whitelist /
+  // blacklist to data/*.json. Unset = mirror is disabled and the cron is a
+  // no-op (the public /v1/whitelist endpoint still works).
   WHITELIST_SYNC_TOKEN?: string;
   WHITELIST_SYNC_REPO?: string; // "owner/repo", defaults to foru17/make-x-great-again
 }
@@ -34,8 +33,8 @@ type Ctx = Context<{ Bindings: Env }>;
 
 const AUTO_CONF = 0.9; // AI confidence floor for auto-publish
 const AUTO_REPORTERS = 3; // distinct GitHub reporters required for auto-publish
-// LUO-35 Wave 12a: GH accounts younger than this don't count toward the
-// auto-publish reporter threshold. Their reports are still stored (audit /
+// GH accounts younger than this don't count toward the auto-publish
+// reporter threshold. Their reports are still stored (audit /
 // future re-evaluation), but a fresh throwaway account can't help flip
 // status to human_confirmed. 90d is a common drive-by abuse cutoff.
 const REPORTER_MIN_AGE_DAYS = 90;
@@ -227,8 +226,8 @@ app.post("/v1/classify", async (c) => {
       signals_hash: string;
       status: string;
     }>();
-  // LUO-35 Wave 12a: hard short-circuit for admin-curated whitelist —
-  // skip the LLM AND ignore signals_hash drift. Whitelist beats heuristics.
+  // Hard short-circuit for admin-curated whitelist — skip the LLM AND ignore
+  // signals_hash drift. Whitelist beats heuristics.
   if (prev && prev.status === "whitelisted") {
     return c.json({
       cached: true,
@@ -253,10 +252,10 @@ app.post("/v1/classify", async (c) => {
   }
   const verdict = await classify(c.env, s);
   const now = Date.now();
-  // LUO-32 Wave 11 L2: high-confidence legit verdicts are cached but kept
-  // out of the maintainer queue. /admin/queue still only selects
-  // status='auto_pending_review', so auto_legit rows are invisible there
-  // but the next /v1/classify hit still gets a free cache return.
+  // High-confidence legit verdicts are cached but kept out of the maintainer
+  // queue. /admin/queue still only selects status='auto_pending_review', so
+  // auto_legit rows are invisible there but the next /v1/classify hit still
+  // gets a free cache return.
   const writeStatus =
     verdict.label === "legit" && verdict.confidence >= 0.85 ? "auto_legit" : "auto_pending_review";
   // Pick the most-relevant public X snippet that triggered this verdict so
@@ -342,8 +341,8 @@ async function submitReport(c: Ctx, source: string) {
     .run();
 
   // Reporter count for auto-publish: only GH accounts older than
-  // REPORTER_MIN_AGE_DAYS count. NULL age = legacy rows (pre-Wave-12) — treat
-  // as eligible so existing maintainer history is preserved.
+  // REPORTER_MIN_AGE_DAYS count. NULL age = legacy rows; treat them as
+  // eligible so existing maintainer history is preserved.
   const cnt = await c.env.DB.prepare(
     `SELECT count(DISTINCT reporter_fp) n FROM reports
        WHERE handle=? AND (x_user_id IS ? OR x_user_id=?)
@@ -497,7 +496,7 @@ app.get("/v1/admin/log", async (c) => {
   });
 });
 
-// ---- Whitelist (LUO-35 Wave 12a) ----
+// ---- Whitelist ----
 // status='whitelisted' acts as a permanent override:
 //   - /v1/classify short-circuits without calling the LLM
 //   - /v1/confirm and /v1/report no-op (whitelisted target absorbs noise)
@@ -770,8 +769,8 @@ app.get("/admin", (c) => {
   return c.html(adminHtml());
 });
 
-// Wave 12b — scheduled mirror of the curated whitelist/blacklist into the
-// upstream GitHub repo as data/whitelist/v1.json and data/blacklist/v1.json.
+// Scheduled mirror of the curated whitelist/blacklist into the upstream
+// GitHub repo as data/whitelist/v1.json and data/blacklist/v1.json.
 // The repo itself becomes the audit log: anyone can clone and verify
 // "which accounts were on the list at any past timestamp" via git history.
 //
@@ -813,7 +812,7 @@ async function mirrorToGitHub(env: Env): Promise<void> {
     commitMessage: string,
   ): Promise<"skipped" | "committed" | "failed"> {
     const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-    const nextBody = JSON.stringify(payload, null, 2) + "\n";
+    const nextBody = `${JSON.stringify(payload, null, 2)}\n`;
     const nextStableHash = contentHash(stableJson(payload));
 
     // GET current file (if any) — need both sha (for upsert) and content
@@ -832,9 +831,7 @@ async function mirrorToGitHub(env: Env): Promise<void> {
       sha = j.sha;
       if (j.content) {
         try {
-          const decoded = decodeURIComponent(
-            escape(atob(j.content.replace(/\n/g, ""))),
-          );
+          const decoded = decodeURIComponent(escape(atob(j.content.replace(/\n/g, ""))));
           const prevPayload = JSON.parse(decoded) as Record<string, unknown>;
           if (contentHash(stableJson(prevPayload)) === nextStableHash) unchanged = true;
         } catch {
@@ -954,8 +951,6 @@ app.post("/v1/admin/sync-mirror", async (c) => {
 export default {
   fetch: app.fetch,
   scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): void {
-    ctx.waitUntil(
-      mirrorToGitHub(env).catch((e) => console.warn("mirror error", e)),
-    );
+    ctx.waitUntil(mirrorToGitHub(env).catch((e) => console.warn("mirror error", e)));
   },
 };

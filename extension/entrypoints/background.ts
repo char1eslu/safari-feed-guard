@@ -153,7 +153,7 @@ export default defineBackground(() => {
     },
   );
 
-  // Wave 12b — keep the local whitelist mirror fresh. Once on install,
+  // Keep the local whitelist mirror fresh. Once on install,
   // once on every browser launch, and every 6h via chrome.alarms while
   // any tab is active. All errors swallowed (the cache is best-effort —
   // a miss just falls back to the normal classify path).
