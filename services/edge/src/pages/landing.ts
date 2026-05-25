@@ -19,9 +19,12 @@ const CSS = `
   filter:drop-shadow(0 18px 32px rgba(29,161,242,.18)) drop-shadow(0 4px 10px rgba(0,0,0,.08))}
 @keyframes bird-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 @media (max-width:920px){
-  .hero-row{grid-template-columns:1fr;gap:24px;padding:44px 0 28px}
-  .hero-mascot{width:220px}
-  .hero-side{align-items:stretch}
+  .hero-row{grid-template-columns:1fr;gap:22px;padding:44px 0 28px}
+  .hero-side{display:grid;grid-template-columns:118px minmax(0,1fr);align-items:center;
+    gap:18px;max-width:560px}
+  .hero-mascot{width:118px;justify-self:center}
+  .hero-stats{max-width:none}
+  .hero-stats .stats-foot{justify-content:flex-start}
 }
 @media (prefers-reduced-motion:reduce){.hero-mascot{animation:none}}
 .hero .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:600;
@@ -224,11 +227,11 @@ section.block h2{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
 @media (max-width:760px){
   .hero{padding:0}
   .hero h1{font-size:40px;letter-spacing:-.03em}
+  .hero .lede{font-size:16px;margin-bottom:24px}
   .pillar{grid-template-columns:1fr;gap:8px;padding:20px}
   .pillar .n{font-size:11px}
   .pillar .status{align-self:flex-start;margin-top:4px}
   .trust{grid-template-columns:1fr}
-  .hero-stats{max-width:none}
   .stats{grid-template-columns:repeat(3,1fr)}
   .stat{padding:14px 10px}
   .stat .n{font-size:22px}
@@ -236,7 +239,20 @@ section.block h2{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
   section.block{padding:48px 0}
 }
 @media (max-width:440px){
+  .hero-row{gap:18px;padding:34px 0 24px}
+  .hero .eyebrow{margin-bottom:20px}
   .hero h1{font-size:34px}
+  .hero .ctas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .hero .ctas .btn{min-height:42px;padding:10px 10px}
+  .hero .ctas .btn.primary{grid-column:1/-1}
+  .hero .meta{font-size:12px}
+  .hero-side{grid-template-columns:72px minmax(0,1fr);gap:10px}
+  .hero-mascot{width:72px}
+  .hero-mascot img{filter:drop-shadow(0 10px 20px rgba(29,161,242,.14))}
+  .stat{padding:10px 7px}
+  .stat .n{font-size:18px}
+  .stat .lbl{font-size:10px;margin-top:5px}
+  .stats-foot{margin-top:9px;font-size:11.5px}
 }
 `;
 

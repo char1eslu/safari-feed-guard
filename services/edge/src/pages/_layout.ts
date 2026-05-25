@@ -185,6 +185,15 @@ a:focus-visible,button:focus-visible{border-radius:var(--r)}
   .nav .links{gap:0;font-size:12.5px}
   .nav .links a{padding:6px 10px}
 }
+@media (max-width:440px){
+  .nav{gap:8px}
+  .nav .right{gap:0}
+  .nav .links a{width:34px;height:34px;padding:0;justify-content:center}
+  .nav .links a span{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+    overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .nav .links a svg{width:15px;height:15px}
+  .theme-btn{width:34px;height:34px;margin-left:2px}
+}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
