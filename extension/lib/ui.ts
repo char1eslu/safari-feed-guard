@@ -139,6 +139,22 @@ svg { display: block; }
   font-weight: 700; color: var(--warn); border: 1px solid var(--warn);
   letter-spacing: .3px;
 }
+/* Source-tier mini-tag — appended to spammy badges so the user can tell
+   公榜命中 / 本地缓存 / AI 现场判定 apart. Same shape as .ntag, varied color. */
+.xss-badge .stag {
+  margin-left: 4px; padding: 0 5px; border-radius: 999px; font-size: 9px;
+  font-weight: 700; letter-spacing: .3px; line-height: 1.55;
+}
+.xss-badge .stag.list  { color: #fff; background: var(--danger); }
+.xss-badge .stag.cache { color: var(--muted); border: 1px solid var(--border); }
+.xss-badge .stag.fresh { color: var(--warn); border: 1px solid var(--warn); }
+/* Whitelist badge — green checkmark, no popover content beyond the badge itself */
+.xss-badge.whitelist {
+  color: var(--safe); border-color: var(--safe);
+}
+.xss-badge.whitelist .wdot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--safe); flex: none;
+}
 .xss-badge.analyzing {
   color: var(--muted); position: relative; overflow: hidden;
 }
@@ -241,6 +257,10 @@ export function createBubble(h: BubbleHandlers, pos: "tr" | "br" = "tr") {
   let open = false;
   let findings: Finding[] = [];
   let scanning = 0; // accounts currently being checked (visible progress)
+  // Total accounts we've gotten a verdict (or skip-decision) on this page.
+  // Lets the pill say "已扫 N · 检查中 M · 命中 K" so the user feels the
+  // scan in motion, not just a static "守护中" until something pops.
+  let scanned = 0;
 
   const sev = (f: Finding[]) =>
     f.some((x) => x.verdict.label === "spam" || x.verdict.label === "porn_bot")
@@ -248,19 +268,21 @@ export function createBubble(h: BubbleHandlers, pos: "tr" | "br" = "tr") {
       : "--warn";
 
   function renderPill() {
-    if (!findings.length && scanning > 0) {
-      // Visible processing feedback (esp. reply sections).
-      pill.innerHTML = `${icon("shield", "var(--brand)", 16)}<span class="n" style="font-weight:600;color:var(--muted)">检查中 ${scanning}…</span>`;
+    // Spammy findings present → alarm tone takes priority, shows count.
+    if (findings.length) {
+      const c = `var(${sev(findings)})`;
+      const trail = scanning > 0 ? ` · 还在查 ${scanning}` : "";
+      pill.innerHTML = `${icon("shield-alert", c, 16)}<span class="n">${findings.length}${trail}</span>`;
       return;
     }
-    if (!findings.length) {
-      // Calm "guarding" state — confirms the extension is working even
-      // when nothing suspicious is on the page (no alarm color).
-      pill.innerHTML = `${icon("shield-check", "var(--brand)", 16)}<span class="n" style="font-weight:600;color:var(--muted)">守护中</span>`;
+    // Active scanning, nothing flagged yet → "已扫 X · 查 Y"
+    if (scanning > 0 || scanned > 0) {
+      const trail = scanning > 0 ? ` · 查 ${scanning}` : "";
+      pill.innerHTML = `${icon("shield", "var(--brand)", 16)}<span class="n" style="font-weight:600;color:var(--muted)">已扫 ${scanned}${trail}</span>`;
       return;
     }
-    const c = `var(${sev(findings)})`;
-    pill.innerHTML = `${icon("shield-alert", c, 16)}<span class="n">${findings.length}</span>`;
+    // Calm "guarding" — page is idle, no signal in either direction.
+    pill.innerHTML = `${icon("shield-check", "var(--brand)", 16)}<span class="n" style="font-weight:600;color:var(--muted)">守护中</span>`;
   }
 
   function renderCard() {
@@ -435,6 +457,13 @@ export function createBubble(h: BubbleHandlers, pos: "tr" | "br" = "tr") {
       scanning = Math.max(0, n);
       if (!open) renderPill();
     },
+    /** Bump the "X accounts evaluated this page" counter. Drives the pill's
+     *  scan-progress label so the user sees motion on big reply threads even
+     *  when most accounts come back clean. */
+    bumpScanned() {
+      scanned++;
+      if (!open) renderPill();
+    },
   };
 }
 
@@ -447,9 +476,13 @@ export interface BadgeActions {
 }
 
 /** Inline pill on the author row; hover/focus → popover with reasons. */
-/** source: 'fresh' = just classified (rise-in); 'list'/'cache' = already on
- *  record → instant calm "known" marker, no processing implied. */
-export type BadgeSource = "fresh" | "list" | "cache";
+/** Where a verdict came from. Drives badge color + tag so the user can tell
+ *  「公榜确认 / 本地缓存 / AI 现场判定 / 维护者白名单」apart at a glance.
+ *  - `list`      → human-confirmed public blacklist hit  → red 公榜 tag
+ *  - `whitelist` → maintainer-curated safe list hit       → green 白名单 badge
+ *  - `cache`     → local L2 cache hit (no network call)   → muted 缓存 tag
+ *  - `fresh`     → just classified by the AI this session → amber AI tag */
+export type BadgeSource = "fresh" | "list" | "cache" | "whitelist";
 
 /** Animated transient states for newly-found accounts. */
 export function createStatusBadge(kind: "analyzing" | "pending"): HTMLElement {
@@ -472,6 +505,15 @@ export function createBadge(
 ): HTMLElement {
   const el = document.createElement("span");
   el.tabIndex = 0;
+  // Maintainer whitelist hit — short-circuit to a green "已加入白名单" badge.
+  // Doesn't pop a verdict card; the user just needs to know "this account is
+  // explicitly vetted, don't worry about it".
+  if (source === "whitelist") {
+    el.className = "xss-badge whitelist";
+    el.title = "MXGA 维护者已确认安全（白名单）";
+    el.innerHTML = `<span class="wdot"></span>${icon("shield-check", "var(--safe)", 13)}<span>白名单</span>`;
+    return el;
+  }
   if (!v) {
     el.className = "xss-badge ghost";
     el.innerHTML = `${icon("shield", "currentColor", 13)}<span>检查</span>`;
@@ -483,18 +525,24 @@ export function createBadge(
   const known = source === "list" || source === "cache";
   el.className = `xss-badge ${known ? "known" : "fresh"}`;
   el.style.borderColor = color;
+  // Tier-specific tooltip + tag — tells the user exactly which gate matched.
   const tip =
     source === "list"
-      ? "命中公共名单"
+      ? "公榜确认：≥1 个维护者已经把此账号公开拉黑"
       : source === "cache"
-        ? "本地缓存命中"
-        : "首次发现（本机首次判定，已记录待人工确认）";
+        ? "本地缓存命中：本机之前已经判过这个号"
+        : "AI 现场判定：本次会话首次扫描，已记录待人工确认";
   el.title = tip;
-  // known → solid brand dot; fresh → hollow "first discovery" ring + 首发 tag
   const mark = known
     ? `<span class="kdot" title="${tip}"></span>`
     : `<span class="ndot" title="${tip}"></span>`;
-  const tag = known ? "" : `<span class="ntag" title="${tip}">首发</span>`;
+  // Source-tier mini-tag. Spammy badges only — legit verdicts don't need the
+  // origin call-out (a "legit · 公榜" badge would be confusing).
+  const spammy = v.label === "spam" || v.label === "porn_bot" || v.label === "likely_spam";
+  const tagText = source === "list" ? "公榜" : source === "cache" ? "缓存" : "AI";
+  const tag = spammy
+    ? `<span class="stag ${source}" title="${tip}">${tagText}</span>`
+    : "";
   el.innerHTML =
     `${mark}${icon(meta.ic, color, 13)}<span style="color:${color}">${meta.zh} ${(v.confidence * 100).toFixed(0)}%</span>${tag}`;
 

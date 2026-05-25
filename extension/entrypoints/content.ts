@@ -378,6 +378,14 @@ export default defineContentScript({
       }
     });
 
+    // De-dup the "已扫"counter — a single account may render a badge
+    // multiple times (recycled DOM node) and we don't want a double-count.
+    const scannedKeys = new Set<string>();
+    function tallyScan(key: string) {
+      if (scannedKeys.has(key)) return;
+      scannedKeys.add(key);
+      bubbleApi?.bumpScanned();
+    }
     function badgeFor(
       anchor: HTMLElement,
       key: string,
@@ -386,6 +394,7 @@ export default defineContentScript({
       note?: string,
       source: BadgeSource = "fresh",
     ) {
+      tallyScan(key);
       clearMounts(anchor);
       mountBadge(anchor, () =>
         createBadge(
@@ -454,8 +463,10 @@ export default defineContentScript({
       // 0a. Maintainer whitelist (Wave 12b L0a) — admin-curated accounts that
       //     should never be touched by AI. Local mirror is refreshed every
       //     6h in the bg worker; miss = unknown = fall through normally.
+      //     UX: source="whitelist" makes the badge a visible green ✓
+      //     so the user knows this is *vetted* (not "we just didn't bother").
       if (isWhitelisted(sig.handle, sig.userId)) {
-        badgeFor(anchor, key, sig, null); // looks legit, no badge / no LLM
+        badgeFor(anchor, key, sig, null, undefined, "whitelist");
         return;
       }
 
