@@ -1,8 +1,13 @@
 {
   "schema": 1,
-  "generatedAt": 1779732033856,
-  "count": 38,
+  "generatedAt": 1779753633803,
+  "count": 39,
   "list": [
+    {
+      "handle": "yucheng",
+      "x_user_id": "1964737537479512064",
+      "last_scored": 1779749793584
+    },
     {
       "handle": "AI_Jasonyu",
       "x_user_id": "1877193368725581824",
