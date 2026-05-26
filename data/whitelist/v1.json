@@ -1,8 +1,68 @@
 {
   "schema": 1,
-  "generatedAt": 1779753633803,
-  "count": 39,
+  "generatedAt": 1779775207622,
+  "count": 51,
   "list": [
+    {
+      "handle": "li9292",
+      "x_user_id": "1958447835365707776",
+      "last_scored": 1779766332817
+    },
+    {
+      "handle": "xxm459259",
+      "x_user_id": "1560910357811433473",
+      "last_scored": 1779766324013
+    },
+    {
+      "handle": "mrahmadawais",
+      "x_user_id": null,
+      "last_scored": 1779766301707
+    },
+    {
+      "handle": "lonely__mh",
+      "x_user_id": "1141385957234470912",
+      "last_scored": 1779766239904
+    },
+    {
+      "handle": "manateelazycat",
+      "x_user_id": "768239262",
+      "last_scored": 1779766232041
+    },
+    {
+      "handle": "pengchujin",
+      "x_user_id": "1772530812078239744",
+      "last_scored": 1779765663661
+    },
+    {
+      "handle": "hitw93",
+      "x_user_id": "1960753219115868169",
+      "last_scored": 1779764647809
+    },
+    {
+      "handle": "xuemanzi8848",
+      "x_user_id": "1530501729539997696",
+      "last_scored": 1779764608853
+    },
+    {
+      "handle": "mrmicopedia",
+      "x_user_id": "1647299776302686209",
+      "last_scored": 1779760008762
+    },
+    {
+      "handle": "vista8",
+      "x_user_id": "1960882043249942533",
+      "last_scored": 1779759927885
+    },
+    {
+      "handle": "geekbb",
+      "x_user_id": null,
+      "last_scored": 1779759925313
+    },
+    {
+      "handle": "yanhua1010",
+      "x_user_id": "1998302113592713216",
+      "last_scored": 1779759910330
+    },
     {
       "handle": "yucheng",
       "x_user_id": "1964737537479512064",
@@ -144,11 +204,6 @@
       "last_scored": 1779723855166
     },
     {
-      "handle": "op7418",
-      "x_user_id": null,
-      "last_scored": 1779723855166
-    },
-    {
       "handle": "ArthurUnde55893",
       "x_user_id": null,
       "last_scored": 1779723855166
@@ -156,11 +211,6 @@
     {
       "handle": "amiaoapp",
       "x_user_id": "1636188090942517249",
-      "last_scored": 1779723855166
-    },
-    {
-      "handle": "luoleiorg",
-      "x_user_id": null,
       "last_scored": 1779723855166
     },
     {
@@ -197,6 +247,16 @@
       "handle": "miantiao_me",
       "x_user_id": "1648180024464539648",
       "last_scored": 1779723855166
+    },
+    {
+      "handle": "luoleiorg",
+      "x_user_id": "1550157622300786688",
+      "last_scored": 1779713805181
+    },
+    {
+      "handle": "op7418",
+      "x_user_id": "1636981205504786434",
+      "last_scored": 1779707927047
     }
   ]
 }
