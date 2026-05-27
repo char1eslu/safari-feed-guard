@@ -1532,7 +1532,8 @@ app.get("/v1/admin/whitelist", async (c) => {
   const before = Number(c.req.query("before")) || null;
   const limit = Math.min(200, Math.max(1, Number(c.req.query("limit")) || 100));
   const rows = await c.env.DB.prepare(
-    `SELECT x_user_id, handle, display_name, avatar_url, reasons, last_scored
+    `SELECT x_user_id, handle, display_name, avatar_url, reasons, last_scored,
+            last_decided_by, last_decided_at
        FROM accounts
       WHERE status='whitelisted'
         AND (?1 IS NULL OR last_scored < ?1)
@@ -1546,6 +1547,8 @@ app.get("/v1/admin/whitelist", async (c) => {
       avatar_url: string | null;
       reasons: string;
       last_scored: number;
+      last_decided_by: string | null;
+      last_decided_at: number | null;
     }>();
   const list = rows.results ?? [];
   return c.json({
@@ -1564,6 +1567,7 @@ app.get("/v1/admin/blacklist", async (c) => {
   const rows = await c.env.DB.prepare(
     `SELECT a.x_user_id, a.handle, a.display_name, a.avatar_url,
             a.verdict_label, a.confidence, a.reasons, a.evidence_text, a.published_at,
+            a.last_decided_by, a.last_decided_at,
             (SELECT count(DISTINCT r.reporter_fp) FROM reports r
               WHERE r.handle=a.handle
                 AND ifnull(r.x_user_id,'')=ifnull(a.x_user_id,'')) reporters
@@ -1582,6 +1586,8 @@ app.get("/v1/admin/blacklist", async (c) => {
       confidence: number;
       reasons: string;
       published_at: number;
+      last_decided_by: string | null;
+      last_decided_at: number | null;
       reporters: number;
     }>();
   const list = rows.results ?? [];

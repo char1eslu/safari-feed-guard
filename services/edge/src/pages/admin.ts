@@ -260,6 +260,17 @@ input::placeholder{color:var(--fg-4)}
   align-items:center;gap:6px;flex-wrap:wrap}
 .qrow .who .sub a{color:var(--fg-2)}.qrow .who .sub a:hover{color:var(--accent)}
 .qrow .who .sub .sep{color:var(--fg-4);opacity:.5}
+.actor{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:999px;
+       font-size:11px;font-weight:500;line-height:1.5;border:1px solid var(--border);
+       background:var(--card);color:var(--fg-2);white-space:nowrap}
+.actor-human{color:var(--fg);background:var(--card-hi);border-color:var(--border-strong)}
+.actor-agent{color:#5b3fb0;background:#f1ecff;border-color:#d9cfff}
+.actor-rule{color:#6b4a1f;background:#fff3df;border-color:#f0d8a4}
+.actor-sys{color:var(--fg-3)}
+@media (prefers-color-scheme:dark){
+  .actor-agent{color:#c9b9ff;background:#2a1f55;border-color:#3d2f7a}
+  .actor-rule{color:#f0d8a4;background:#3b2a14;border-color:#5a4221}
+}
 .qrow .who .sub .id-chip{display:inline-flex;align-items:center;max-width:24ch;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
   font-size:10.5px;color:var(--fg-2);padding:1px 6px;border-radius:var(--r-sm);
@@ -554,6 +565,23 @@ const SCRIPT = String.raw`
   function $(id){return document.getElementById(id)}
   function setStatus(s){var el=$('status');if(el)el.textContent=s||''}
   function ago(ms){if(!ms)return'';var d=Date.now()-ms,s=Math.round(d/1000);if(s<60)return s+'s';var m=Math.round(s/60);if(m<60)return m+'m';var h=Math.round(m/60);if(h<24)return h+'h';return Math.round(h/24)+'d'}
+  // Render a small chip indicating who/what made the most recent decision
+  // on this row. Format from D1.accounts.last_decided_by:
+  //   'human:<actor>'  → 👤 actor       (you / a maintainer)
+  //   'agent:<id>'     → 🤖 <id>        (a side-channel agent, e.g. hermes)
+  //   'rule:<id>'      → 🔧 规则#<id>   (a keyword rule auto-decided)
+  //   'system'         → 🛠 system
+  //   null/empty       → empty string (don't render)
+  function actorBadge(by){
+    if(!by)return '';
+    var i=by.indexOf(':');
+    var kind=i>=0?by.slice(0,i):by;
+    var who=i>=0?by.slice(i+1):'';
+    if(kind==='human')return '<span class="actor actor-human" title="人工决策：'+E(who)+'">👤 '+E(who||'人工')+'</span>';
+    if(kind==='agent')return '<span class="actor actor-agent" title="AI agent 决策：'+E(who)+'">🤖 '+E(who||'agent')+'</span>';
+    if(kind==='rule')return '<span class="actor actor-rule" title="关键词规则 #'+E(who)+'">🔧 规则#'+E(who)+'</span>';
+    return '<span class="actor actor-sys" title="'+E(by)+'">🛠 '+E(by)+'</span>';
+  }
   function key(a){return (a.x_user_id||'')+'|'+a.handle}
   function api(p,o){return fetch(p,Object.assign({},o||{},{headers:Object.assign({'x-admin-token':TOK},(o&&o.headers)||{})}))}
 
@@ -1314,12 +1342,13 @@ const SCRIPT = String.raw`
         +'<input type="checkbox"'+(wlSel.has(k)?' checked':'')+' aria-label="选中 @'+E(a.handle)+'">'
         +'<div class="av"><img src="'+E(av)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\''+fb+'\'}))"></div>'
         +'<div class="who">'
-          +'<div class="name">'+nameLink(a)+'<span class="vlbl">白名单</span></div>'
+          +'<div class="name">'+nameLink(a)+'<span class="vlbl">白名单</span>'
+            +(a.last_decided_by?' '+actorBadge(a.last_decided_by):'')+'</div>'
           +'<div class="sub">'
             +handleLink(a.handle)
             +idChip(a.x_user_id)
             +(note?'<span class="sep">·</span><span>'+E(note)+'</span>':'')
-            +'<span class="sep">·</span><span>'+ago(a.last_scored)+'</span>'
+            +'<span class="sep">·</span><span title="'+E(new Date(a.last_decided_at||a.last_scored).toLocaleString('zh-CN'))+'">加入 '+ago(a.last_decided_at||a.last_scored)+'</span>'
           +'</div>'
         +'</div>'
         +'<span></span><span></span>'
@@ -1468,11 +1497,13 @@ const SCRIPT = String.raw`
         +'<input type="checkbox"'+(blSel.has(k)?' checked':'')+' aria-label="选中 @'+E(a.handle)+'">'
         +'<div class="av"><img src="'+E(av)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\''+fb+'\'}))"></div>'
         +'<div class="who">'
-          +'<div class="name">'+nameLink(a)+'<span class="vlbl">'+E(lblZh)+'</span></div>'
+          +'<div class="name">'+nameLink(a)+'<span class="vlbl">'+E(lblZh)+'</span>'
+            +(a.last_decided_by?' '+actorBadge(a.last_decided_by):'')+'</div>'
           +'<div class="sub">'
             +handleLink(a.handle)
             +idChip(a.x_user_id)
-            +'<span class="sep">·</span><span>已公榜 '+ago(a.published_at)+'</span>'
+            +'<span class="sep">·</span><span title="'+E(new Date(a.published_at||a.last_decided_at).toLocaleString('zh-CN'))+'">已公榜 '+ago(a.published_at)+'</span>'
+            +(a.last_decided_at&&a.last_decided_at!==a.published_at?'<span class="sep">·</span><span title="'+E(new Date(a.last_decided_at).toLocaleString('zh-CN'))+'">决策 '+ago(a.last_decided_at)+'</span>':'')
           +'</div>'
         +'</div>'
         +'<div class="conf"><div class="pct">'+conf+'%<span class="lbl">把握</span></div></div>'
