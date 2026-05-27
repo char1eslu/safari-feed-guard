@@ -967,6 +967,12 @@ app.get("/v1/admin/stats", async (c) => {
     auto_legit: byStatus.auto_legit ?? 0,
     pending_raw: byStatus.auto_pending_review ?? 0,
     reports: reportsRow?.n ?? 0,
+    // Agent staging buckets — populated by the side-channel agent pipeline
+    // (see docs/AGENT.md). These rows are NOT on the public list yet; they
+    // wait for a human (or governance auto-promotion) to flip them.
+    agent_blacklist: byStatus.agent_blacklist ?? 0,
+    agent_whitelist: byStatus.agent_whitelist ?? 0,
+    agent_pending: byStatus.agent_pending ?? 0,
   });
 });
 type DecideAction = "approve" | "reject" | "remove" | "whitelist";
@@ -2089,6 +2095,183 @@ app.get("/v1/agent/stats", async (c) => {
     by_decided_by: byDecidedBy.results ?? [],
     decisions_last_24h: last24?.n ?? 0,
   });
+});
+
+// =========================================================================
+// Admin-side surface for the agent pipeline
+// =========================================================================
+// The agent decision endpoint lives at /v1/agent/decide (Bearer AGENT_TOKEN),
+// but the admin /admin UI needs its own surface to review those agent
+// verdicts — using the maintainer's ADMIN_TOKEN, not the agent token. The
+// two endpoints below serve the three agent-curated staging buckets and
+// let the maintainer 1-click promote / reject / move them.
+
+// GET /v1/admin/agent-list?bucket=blacklist|whitelist|pending&limit=&before=
+// Returns the agent-staged rows so /admin can render them with full
+// agent reasoning (label, confidence, fired_signals, evidence, notes).
+app.get("/v1/admin/agent-list", async (c) => {
+  if (!admin(c)) return c.json({ error: "forbidden" }, 403);
+  const bucket = (c.req.query("bucket") || "").trim();
+  const map: Record<string, string> = {
+    blacklist: "agent_blacklist",
+    whitelist: "agent_whitelist",
+    pending: "agent_pending",
+  };
+  const status = map[bucket];
+  if (!status) return c.json({ error: "bad_bucket" }, 400);
+  const before = Number(c.req.query("before")) || null;
+  const limit = Math.min(200, Math.max(1, Number(c.req.query("limit")) || 100));
+  const rows = await c.env.DB.prepare(
+    `SELECT x_user_id, handle, display_name, avatar_url,
+            verdict_label, confidence, reasons, evidence_text,
+            agent_id, agent_label, agent_confidence, agent_reasons,
+            agent_signals, agent_evidence, agent_action, agent_model,
+            agent_at, last_decided_by, last_decided_at, last_scored
+       FROM accounts
+      WHERE status=?
+        AND (?2 IS NULL OR agent_at < ?2)
+      ORDER BY agent_at DESC LIMIT ?3`,
+  )
+    .bind(status, before, limit)
+    .all<{ agent_at: number }>();
+  const list = rows.results ?? [];
+  return c.json({
+    bucket,
+    list,
+    nextBefore: list.length === limit ? list[list.length - 1].agent_at : null,
+  });
+});
+
+// POST /v1/admin/agent-promote
+// Maintainer reviews an agent-staged row and decides what really happens.
+// target: "blacklist" → human_confirmed (public list)
+//         "whitelist" → whitelisted (official whitelist)
+//         "reject"    → rejected (drop, keep audit)
+//         "requeue"   → auto_pending_review (kick back to LLM-fresh queue)
+// Reuses buildDecideStatements where possible so the existing decide path
+// and this promotion path can't drift behaviorally.
+const AgentPromoteBody = z.object({
+  handle: z.string().min(1),
+  x_user_id: z.string().regex(/^\d+$/).optional(),
+  target: z.enum(["blacklist", "whitelist", "reject", "requeue"]),
+});
+const AgentPromoteBatch = z.object({
+  target: z.enum(["blacklist", "whitelist", "reject", "requeue"]),
+  items: z
+    .array(
+      z.object({
+        handle: z.string().min(1),
+        x_user_id: z.string().regex(/^\d+$/).optional(),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+
+function agentPromoteStmts(
+  env: Env,
+  handle: string,
+  xUserId: string | undefined,
+  target: z.infer<typeof AgentPromoteBody>["target"],
+  now: number,
+): D1PreparedStatement[] {
+  if (target === "requeue") {
+    // Wipe the agent annotation and put the row back on the LLM-fresh queue.
+    const sql = xUserId
+      ? `UPDATE accounts
+            SET status='auto_pending_review',
+                last_decided_by=NULL, last_decided_at=NULL
+          WHERE lower(handle)=? AND x_user_id=?`
+      : `UPDATE accounts
+            SET status='auto_pending_review',
+                last_decided_by=NULL, last_decided_at=NULL
+          WHERE lower(handle)=? AND x_user_id IS NULL`;
+    const stmt = env.DB.prepare(sql);
+    return xUserId ? [stmt.bind(handle, xUserId)] : [stmt.bind(handle)];
+  }
+  // approve / whitelist / reject reuse the existing buildDecideStatements
+  // contract so the published_at and sibling-cleanup logic stays single-source.
+  const action: DecideAction =
+    target === "blacklist" ? "approve" : target === "whitelist" ? "whitelist" : "reject";
+  return buildDecideStatements(env, handle, xUserId, action, now);
+}
+
+app.post("/v1/admin/agent-promote", async (c) => {
+  if (!admin(c)) return c.json({ error: "forbidden" }, 403);
+  let body: z.infer<typeof AgentPromoteBody>;
+  try {
+    body = AgentPromoteBody.parse(await c.req.json());
+  } catch (err) {
+    return c.json({ error: "bad_request", detail: (err as Error).message }, 400);
+  }
+  const handle = normalizeHandle(body.handle);
+  const now = Date.now();
+  const stmts = agentPromoteStmts(c.env, handle, body.x_user_id, body.target, now);
+  // Audit: log who promoted the agent decision and to what.
+  stmts.push(
+    c.env.DB.prepare(
+      "INSERT INTO review_log (x_user_id,handle,action,actor,note,at) VALUES (?,?,?,?,?,?)",
+    ).bind(
+      body.x_user_id ?? null,
+      handle,
+      `agent_promote_${body.target}`,
+      "admin",
+      "promoted from agent staging",
+      now,
+    ),
+  );
+  // Mark this as a human decision now, overriding the prior agent stamp on
+  // last_decided_by — useful for the BL/WL panel chips.
+  if (body.target !== "requeue") {
+    stmts.push(
+      c.env.DB.prepare(
+        body.x_user_id
+          ? "UPDATE accounts SET last_decided_by='human:admin', last_decided_at=? WHERE lower(handle)=? AND x_user_id=?"
+          : "UPDATE accounts SET last_decided_by='human:admin', last_decided_at=? WHERE lower(handle)=? AND x_user_id IS NULL",
+      ).bind(...(body.x_user_id ? [now, handle, body.x_user_id] : [now, handle])),
+    );
+  }
+  await c.env.DB.batch(stmts);
+  return c.json({ ok: true, target: body.target });
+});
+
+app.post("/v1/admin/agent-promote-batch", async (c) => {
+  if (!admin(c)) return c.json({ error: "forbidden" }, 403);
+  let body: z.infer<typeof AgentPromoteBatch>;
+  try {
+    body = AgentPromoteBatch.parse(await c.req.json());
+  } catch (err) {
+    return c.json({ error: "bad_request", detail: (err as Error).message }, 400);
+  }
+  const now = Date.now();
+  const stmts: D1PreparedStatement[] = [];
+  for (const it of body.items) {
+    const h = normalizeHandle(it.handle);
+    stmts.push(...agentPromoteStmts(c.env, h, it.x_user_id, body.target, now));
+    stmts.push(
+      c.env.DB.prepare(
+        "INSERT INTO review_log (x_user_id,handle,action,actor,note,at) VALUES (?,?,?,?,?,?)",
+      ).bind(
+        it.x_user_id ?? null,
+        h,
+        `agent_promote_${body.target}`,
+        "admin",
+        "promoted from agent staging (batch)",
+        now,
+      ),
+    );
+    if (body.target !== "requeue") {
+      stmts.push(
+        c.env.DB.prepare(
+          it.x_user_id
+            ? "UPDATE accounts SET last_decided_by='human:admin', last_decided_at=? WHERE lower(handle)=? AND x_user_id=?"
+            : "UPDATE accounts SET last_decided_by='human:admin', last_decided_at=? WHERE lower(handle)=? AND x_user_id IS NULL",
+        ).bind(...(it.x_user_id ? [now, h, it.x_user_id] : [now, h])),
+      );
+    }
+  }
+  await c.env.DB.batch(stmts);
+  return c.json({ ok: true, target: body.target, processed: body.items.length });
 });
 
 /** Admin-only manual trigger — handy after a batch of admin decisions when
