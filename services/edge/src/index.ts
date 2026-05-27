@@ -22,6 +22,7 @@ interface Env {
   // with the currently shipped extension's login flow.
   REQUIRE_AUTH?: string;
   ADMIN_TOKEN?: string; // bearer for the admin moderation endpoints
+  AGENT_TOKEN?: string; // bearer for the side-channel agent endpoints (/v1/agent/*)
   // Fine-grained GitHub PAT scoped to Contents:Write on the upstream repo,
   // used by the scheduled handler to mirror the curated whitelist /
   // blacklist to data/*.json. Unset = mirror is disabled and the cron is a
@@ -1886,6 +1887,203 @@ async function mirrorToGitHub(env: Env): Promise<void> {
     `data(blacklist): sync · ${blCount} total · ${today}`,
   );
 }
+
+// =========================================================================
+// Side-channel AGENT pipeline (see docs/AGENT.md)
+// =========================================================================
+// A side-channel "second-opinion" agent (Hermes on a mac mini being the
+// reference impl) polls /v1/agent/queue, runs deeper analysis with X data
+// access, and POSTs decisions back via /v1/agent/decide.
+//
+// Governance hard line: agents can write the three staging statuses
+// (agent_blacklist / agent_whitelist / agent_pending) but CANNOT write
+// human_confirmed / whitelisted directly. The existing AI≥0.9 + ≥3 GH
+// reporters rule and human admin actions remain the only paths to the
+// public list and the official whitelist.
+//
+// Auth: Bearer <AGENT_TOKEN> (independent secret from ADMIN_TOKEN — easier
+// to rotate, smaller blast radius).
+function agent(c: Ctx): { ok: true; agentId: string } | { ok: false } {
+  const t = c.env.AGENT_TOKEN;
+  if (!t) return { ok: false };
+  const auth = c.req.raw.headers.get("authorization") ?? "";
+  const tok = auth.replace(/^Bearer\s+/i, "").trim();
+  if (tok !== t) return { ok: false };
+  // X-Agent-Id is a self-identifier (e.g. "hermes", "claude-luolei-laptop").
+  // Used for audit + per-agent throttling later; doesn't grant authority.
+  const id = (c.req.raw.headers.get("x-agent-id") ?? "").trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9_:-]{0,63}$/.test(id)) return { ok: false };
+  return { ok: true, agentId: id };
+}
+
+// GET /v1/agent/queue — items the agent should look at next.
+// Returns auto_pending_review rows where the agent either hasn't scored yet
+// or scored against a stale signals_hash. Ordered last_scored DESC so fresh
+// items get attention first. Capped to 100 per call to bound work.
+app.get("/v1/agent/queue", async (c) => {
+  const a = agent(c);
+  if (!a.ok) return c.json({ error: "forbidden" }, 403);
+  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit")) || 30));
+  const rows = await c.env.DB.prepare(
+    `SELECT x_user_id, handle, display_name, avatar_url, verdict_label, confidence,
+            reasons, evidence_text, last_scored, signals_hash,
+            agent_id, agent_at, agent_signals_hash, agent_attempts
+       FROM accounts
+      WHERE status = 'auto_pending_review'
+        AND agent_attempts < 3
+        AND (agent_at IS NULL OR agent_signals_hash IS NULL OR agent_signals_hash != signals_hash)
+      ORDER BY last_scored DESC
+      LIMIT ?`,
+  )
+    .bind(limit)
+    .all();
+  return c.json({
+    agent_id: a.agentId,
+    queue: rows.results ?? [],
+  });
+});
+
+// POST /v1/agent/decide — agent writes its verdict + (optionally) transitions
+// the row to an agent-tier staging status. Idempotent on (x_user_id|handle).
+//
+// Body shape (Zod-validated below). The `decision` field is what the agent
+// recommends:
+//   "blacklist" → status becomes 'agent_blacklist' (NOT public)
+//   "whitelist" → status becomes 'agent_whitelist' (NOT official WL)
+//   "pending"   → status becomes 'agent_pending'   (待定, surface to human)
+//   "annotate"  → status untouched, agent_* columns updated only
+//
+// We always write the agent_* annotations and append a review_log row with
+// actor='agent:<agent_id>'. We never touch status=human_confirmed or
+// status=whitelisted — those values are explicitly rejected.
+const AgentDecideBody = z.object({
+  x_user_id: z.string().regex(/^\d+$/).optional(),
+  handle: z.string().min(1).max(64),
+  decision: z.enum(["blacklist", "whitelist", "pending", "annotate"]),
+  label: z.enum(["spam", "porn_bot", "likely_spam", "uncertain", "legit"]),
+  confidence: z.number().min(0).max(1),
+  reasons: z.array(z.string().max(200)).max(20).default([]),
+  signals: z.array(z.string().max(20)).max(30).default([]),
+  evidence: z.record(z.unknown()).optional(),
+  action: z.enum(["approve_block", "reject_legit", "needs_human"]),
+  model: z.string().max(80).optional(),
+  signals_hash: z.string().max(64).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+function statusForAgentDecision(d: z.infer<typeof AgentDecideBody>["decision"]): string | null {
+  if (d === "blacklist") return "agent_blacklist";
+  if (d === "whitelist") return "agent_whitelist";
+  if (d === "pending") return "agent_pending";
+  return null; // annotate-only
+}
+
+app.post("/v1/agent/decide", async (c) => {
+  const a = agent(c);
+  if (!a.ok) return c.json({ error: "forbidden" }, 403);
+  let body: z.infer<typeof AgentDecideBody>;
+  try {
+    body = AgentDecideBody.parse(await c.req.json());
+  } catch (err) {
+    return c.json({ error: "bad_request", detail: (err as Error).message }, 400);
+  }
+  const handle = normalizeHandle(body.handle);
+  const uid = body.x_user_id ?? null;
+  const now = Date.now();
+  const nextStatus = statusForAgentDecision(body.decision);
+  const evidenceJson = body.evidence ? JSON.stringify(body.evidence) : null;
+  const reasonsJson = JSON.stringify(body.reasons);
+  const signalsJson = JSON.stringify(body.signals);
+  const decidedBy = `agent:${a.agentId}`;
+  const stmts: D1PreparedStatement[] = [];
+
+  // Write annotation columns. Update statement targets the canonical row;
+  // matches by uid when present (preferred), else by normalized handle.
+  const annotateSql = uid
+    ? `UPDATE accounts
+          SET agent_id=?, agent_label=?, agent_confidence=?, agent_reasons=?,
+              agent_signals=?, agent_evidence=?, agent_action=?, agent_model=?,
+              agent_at=?, agent_signals_hash=?, agent_attempts=agent_attempts+1,
+              agent_error=NULL,
+              last_decided_by=?, last_decided_at=?
+              ${nextStatus ? ", status=?" : ""}
+        WHERE lower(handle)=? AND x_user_id=?`
+    : `UPDATE accounts
+          SET agent_id=?, agent_label=?, agent_confidence=?, agent_reasons=?,
+              agent_signals=?, agent_evidence=?, agent_action=?, agent_model=?,
+              agent_at=?, agent_signals_hash=?, agent_attempts=agent_attempts+1,
+              agent_error=NULL,
+              last_decided_by=?, last_decided_at=?
+              ${nextStatus ? ", status=?" : ""}
+        WHERE lower(handle)=? AND x_user_id IS NULL`;
+  const annotateBinds: unknown[] = [
+    a.agentId,
+    body.label,
+    body.confidence,
+    reasonsJson,
+    signalsJson,
+    evidenceJson,
+    body.action,
+    body.model ?? null,
+    now,
+    body.signals_hash ?? null,
+    decidedBy,
+    now,
+  ];
+  if (nextStatus) annotateBinds.push(nextStatus);
+  annotateBinds.push(handle);
+  if (uid) annotateBinds.push(uid);
+
+  stmts.push(c.env.DB.prepare(annotateSql).bind(...annotateBinds));
+
+  // Audit: every agent decision lands in review_log so the maintainer
+  // panel and the public audit log can show "decided by agent:hermes" with
+  // a click-through to the reasons.
+  const logAction = nextStatus ? `agent_${body.decision}` : "agent_annotate";
+  const noteShort = (body.notes ?? "").slice(0, 400);
+  stmts.push(
+    c.env.DB.prepare(
+      "INSERT INTO review_log (x_user_id,handle,action,actor,note,at) VALUES (?,?,?,?,?,?)",
+    ).bind(uid, handle, logAction, decidedBy, noteShort, now),
+  );
+
+  await c.env.DB.batch(stmts);
+  return c.json({
+    ok: true,
+    agent_id: a.agentId,
+    status: nextStatus ?? "(annotate-only)",
+  });
+});
+
+// GET /v1/agent/stats — quick "what has the agent been doing" health check.
+// Useful for the dashboard, the cron's startup self-check, and ops.
+app.get("/v1/agent/stats", async (c) => {
+  const a = agent(c);
+  if (!a.ok) return c.json({ error: "forbidden" }, 403);
+  const byStatus = await c.env.DB.prepare(
+    `SELECT status, COUNT(*) n FROM accounts
+      WHERE status IN ('agent_blacklist','agent_whitelist','agent_pending')
+      GROUP BY status`,
+  ).all<{ status: string; n: number }>();
+  const byDecidedBy = await c.env.DB.prepare(
+    `SELECT last_decided_by, COUNT(*) n FROM accounts
+      WHERE last_decided_by IS NOT NULL
+      GROUP BY last_decided_by
+      ORDER BY n DESC LIMIT 20`,
+  ).all<{ last_decided_by: string; n: number }>();
+  const last24 = await c.env.DB.prepare(
+    `SELECT COUNT(*) n FROM accounts
+      WHERE agent_at IS NOT NULL AND agent_at >= ?`,
+  )
+    .bind(Date.now() - 24 * 3600_000)
+    .first<{ n: number }>();
+  return c.json({
+    agent_id: a.agentId,
+    by_status: byStatus.results ?? [],
+    by_decided_by: byDecidedBy.results ?? [],
+    decisions_last_24h: last24?.n ?? 0,
+  });
+});
 
 /** Admin-only manual trigger — handy after a batch of admin decisions when
  *  you don't want to wait for the next 6h cron tick. Same code path as the
