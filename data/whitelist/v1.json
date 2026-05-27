@@ -1,8 +1,58 @@
 {
   "schema": 1,
-  "generatedAt": 1779840040308,
-  "count": 83,
+  "generatedAt": 1779861659104,
+  "count": 93,
   "list": [
+    {
+      "handle": "ai_xiaomu",
+      "x_user_id": "885347162233610242",
+      "last_scored": 1779861395248
+    },
+    {
+      "handle": "wangray",
+      "x_user_id": "860873731886862336",
+      "last_scored": 1779855359877
+    },
+    {
+      "handle": "feelinglucky",
+      "x_user_id": "1861948728619552768",
+      "last_scored": 1779855256399
+    },
+    {
+      "handle": "taresky",
+      "x_user_id": "368245720",
+      "last_scored": 1779854480475
+    },
+    {
+      "handle": "indie_maker_fox",
+      "x_user_id": "1865299069092139008",
+      "last_scored": 1779854431970
+    },
+    {
+      "handle": "sitinme",
+      "x_user_id": "830429456",
+      "last_scored": 1779853936416
+    },
+    {
+      "handle": "caozhen672",
+      "x_user_id": "2046894503005483009",
+      "last_scored": 1779853912521
+    },
+    {
+      "handle": "zeroz_jq",
+      "x_user_id": "859790145871937537",
+      "last_scored": 1779850177751
+    },
+    {
+      "handle": "jjgfscbd",
+      "x_user_id": "1117295285309329409",
+      "last_scored": 1779848620815
+    },
+    {
+      "handle": "passluo",
+      "x_user_id": "2048333252612775936",
+      "last_scored": 1779841154631
+    },
     {
       "handle": "mrgafish",
       "x_user_id": "136473839",
