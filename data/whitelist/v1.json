@@ -1,8 +1,13 @@
 {
   "schema": 1,
-  "generatedAt": 1779818439035,
-  "count": 82,
+  "generatedAt": 1779840040308,
+  "count": 83,
   "list": [
+    {
+      "handle": "mrgafish",
+      "x_user_id": "136473839",
+      "last_scored": 1779831010997
+    },
     {
       "handle": "daodao166888",
       "x_user_id": "1955108038651809794",
