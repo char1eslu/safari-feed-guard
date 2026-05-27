@@ -1286,16 +1286,51 @@ const SCRIPT = String.raw`
 
   // ===== Agent staging tabs =================================================
   // Renders the three agent-curated buckets (pending / blacklist / whitelist).
-  // The maintainer can 1-key promote, requeue, or reject each row. Promotion
-  // flips status to a real human-tier value (human_confirmed / whitelisted /
-  // rejected) — the governance red line "AI alone never auto-publishes"
-  // remains intact: every entry on the public list is a human click.
+  // Layout reuses the .qrow 6-column grid (checkbox / av / who / conf / rep /
+  // acts) so it visually aligns with the queue / BL / WL tabs. The fifth
+  // column is intentionally empty here — reporters don't apply.
   var agentRows = [];
   var agentBucket = '';
   var agentCursor = null;
+  var agentSel = new Set();
+  var lastSelIdxA = -1;
+
+  // Plain-language labels for the signal codes the agent emits. Lookup
+  // tables stay in JS (not the prompt) so we can iterate on copy without
+  // re-running the agent. Codes that are not in the table are dropped
+  // from the UI — they belong in audit logs, not in the maintainer view.
+  var SIGNAL_LABELS = {
+    P1: '色情/约炮关键词',
+    P2: '复读模板内容',
+    P3: '回复跑题 + 引流',
+    P5: '新号+0粉+促销',
+    P6: '黑灰产话术',
+    S1: '账号 <90 天',
+    S2: '粉丝 <50',
+    S3: '关注/粉丝比异常',
+    S4: '日发帖 >30',
+    S5: '链接域名单一',
+    S6: '泛拉客话术',
+    L1: '真人画像',
+    L2: '透明自有产品',
+    L3: '历史一致',
+    L4: '正常粉丝盘',
+    N1: '大号 (>5k 粉)',
+    N2: '大号 (>10k 粉)',
+    N3: '老号 + 主题稳定',
+    N4: '存在多轮对话',
+    A1: '内容是观点/政治',
+    A2: '样本太薄',
+    A3: '账号已死/封禁',
+  };
+  function humanSignal(code){
+    return SIGNAL_LABELS[code] || code;
+  }
+
   function loadAgentList(bucket){
     agentBucket=bucket;
     agentRows=[];agentCursor=null;
+    agentSel.clear();lastSelIdxA=-1;
     setStatus('加载中…');
     api('/v1/admin/agent-list?bucket='+encodeURIComponent(bucket)+'&limit=100').then(function(r){
       if(r.status===403){TOK='';localStorage.removeItem('xss_admin');renderLocked();return null}
@@ -1321,11 +1356,9 @@ const SCRIPT = String.raw`
     var v=$('view');
     var bucket=agentBucket;
     var bucketZh={pending:'待定',blacklist:'拟拉黑',whitelist:'拟加白'}[bucket]||bucket;
-    var primaryAct = bucket==='pending'
-      ? {target:'blacklist',label:'确认拉黑',cls:'blacklist'}
-      : bucket==='blacklist'
-        ? {target:'blacklist',label:'确认拉黑',cls:'blacklist'}
-        : {target:'whitelist',label:'确认加白',cls:'ok'};
+    var primaryAct = bucket==='whitelist'
+      ? {target:'whitelist',label:'确认加白',cls:'ok'}
+      : {target:'blacklist',label:'确认拉黑',cls:'blacklist'};
     v.innerHTML=
       '<div class="ahdr">'
         +'<div class="ahdr-l">🤖 agent '+E(bucketZh)+' <span class="ahdr-n" id="agN">'+fmtN(agentRows.length)+(agentCursor?'+':'')+'</span></div>'
@@ -1337,14 +1370,32 @@ const SCRIPT = String.raw`
               : 'agent 给出高置信 legit 判定，尚未进白名单。点 "确认加白" 才会真正入官方白名单。')
         +'</span></div>'
       +'</div>'
-      +'<div id="agrows" class="qlist"></div>'
-      +'<div class="qmore" id="agmorefoot"></div>';
+      +'<div class="batch" id="agbatch">'
+        +'<label class="meta" title="全选已加载范围。Shift+点 可在两次勾选间一次性勾选范围">'
+          +'<input type="checkbox" id="selAllA" aria-label="全选已加载范围">'
+          +'<span>已选 <b id="agselN">0</b> · 当前 <b id="agvisN">0</b><span class="hint">（Shift+点可范围多选）</span></span>'
+        +'</label>'
+        +'<div class="actions">'
+          +'<button class="btn sm '+primaryAct.cls+'" onclick="window.__xss.agBatch(\''+primaryAct.target+'\')">批量'+E(primaryAct.label)+'</button>'
+          +(bucket!=='whitelist'?'<button class="btn sm ok" onclick="window.__xss.agBatch(\'whitelist\')">批量加白</button>':'')
+          +(bucket!=='blacklist'?'<button class="btn sm danger" onclick="window.__xss.agBatch(\'blacklist\')">批量拉黑</button>':'')
+          +'<button class="btn sm muted" onclick="window.__xss.agBatch(\'requeue\')" title="退回待审队列重新走 LLM">批量退回</button>'
+          +'<button class="btn sm muted" onclick="window.__xss.agBatch(\'reject\')">批量拒绝</button>'
+          +'<button class="btn sm" onclick="window.__xss.agClearSel()">清空选择</button>'
+        +'</div>'
+      +'</div>'
+      +'<div class="rows" id="agrows"></div>'
+      +'<div class="more-foot" id="agmoreFoot">'
+        +(agentCursor?'<button class="btn sm" id="agmore">加载更多</button>':'')
+        +'<span>已加载 '+fmtN(agentRows.length)+' 条'+(agentCursor?'（还有更多）':'（全部）')+'</span>'
+      +'</div>';
     var box=$('agrows');
     if(!agentRows.length){
       box.innerHTML='<div class="empty">'+E(bucketZh)+'桶当前为空。agent 每 15 分钟自动扫待审队列。</div>';
-      return;
+      agRefreshBatch();return;
     }
     box.innerHTML=agentRows.map(function(a,i){
+      var k=(a.x_user_id||'')+'|'+a.handle;
       var av=a.avatar_url||('https://unavatar.io/twitter/'+encodeURIComponent(a.handle));
       var fb=E((a.handle||'?').slice(0,1).toUpperCase());
       var aLbl=a.agent_label||'uncertain';
@@ -1363,23 +1414,24 @@ const SCRIPT = String.raw`
       if(ev.x_status&&ev.x_status!=='active'&&ev.x_status!=='unknown')evChips.push('X 状态: '+ev.x_status);
       if(ev.reply_offtopic_ratio!=null)evChips.push('回复跑题率 '+Math.round(ev.reply_offtopic_ratio*100)+'%');
       var nameHtml='<a href="'+E(xUrl(a.handle))+'" target="_blank" rel="noopener">'+E(displayName(a))+'</a>';
-      return '<div class="qrow '+E(aLbl)+'" data-h="'+E(a.handle)+'" data-u="'+E(a.x_user_id||'')+'">'
-        +'<input type="checkbox" data-aidx="'+i+'" aria-label="选中 @'+E(a.handle)+'">'
+      return '<div class="qrow '+E(aLbl)+(agentSel.has(k)?' sel':'')+'" data-k="'+E(k)+'" data-idx="'+i+'" data-h="'+E(a.handle)+'" data-u="'+E(a.x_user_id||'')+'">'
+        +'<input type="checkbox"'+(agentSel.has(k)?' checked':'')+' aria-label="选中 @'+E(a.handle)+'">'
         +'<div class="av"><img src="'+E(av)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\''+fb+'\'}))"></div>'
         +'<div class="who">'
           +'<div class="name">'+nameHtml+'<span class="vlbl">'+E(aLblZh)+'</span>'
-            +(a.agent_id?' <span class="actor actor-agent">🤖 '+E(a.agent_id)+'</span>':'')
+            +(a.agent_id?' <span class="actor actor-agent" title="决策来源：'+E(a.agent_id)+'">🤖 '+E(a.agent_id)+'</span>':'')
           +'</div>'
           +'<div class="sub">'
             +handleLink(a.handle)
             +idChip(a.x_user_id)
             +'<span class="sep">·</span><span title="'+E(new Date(a.agent_at||a.last_scored).toLocaleString('zh-CN'))+'">agent 决策 '+ago(a.agent_at||a.last_scored)+'</span>'
           +'</div>'
-          +(signals.length?'<div class="agent-signals">'+signals.map(function(s){return '<span class="agent-sig">'+E(s)+'</span>'}).join('')+'</div>':'')
+          +(signals.length?'<div class="agent-signals">'+signals.map(function(s){return '<span class="agent-sig" title="'+E(s)+'">'+E(humanSignal(s))+'</span>'}).join('')+'</div>':'')
           +(reasons.length?'<div class="agent-reasons">'+reasons.slice(0,4).map(function(r){return '<span>· '+E(r)+'</span>'}).join('')+'</div>':'')
           +(evChips.length?'<div class="agent-evidence">'+evChips.map(function(c){return '<span class="agent-evc">'+E(c)+'</span>'}).join('')+'</div>':'')
         +'</div>'
         +'<div class="conf"><div class="pct">'+aConf+'%<span class="lbl">把握</span></div></div>'
+        +'<span></span>'
         +'<div class="acts">'
           +'<button class="btn sm '+primaryAct.cls+'" data-ag-act="'+primaryAct.target+'">'+E(primaryAct.label)+'</button>'
           +(bucket!=='whitelist'?'<button class="btn sm ok" data-ag-act="whitelist">加白</button>':'')
@@ -1389,9 +1441,34 @@ const SCRIPT = String.raw`
         +'</div>'
       +'</div>';
     }).join('');
-    var more=$('agmorefoot');
-    if(more)more.innerHTML=agentCursor?'<button class="btn sm" id="agmore">加载更多</button>':'';
-    var agmore=$('agmore');if(agmore)agmore.addEventListener('click',loadAgentListMore);
+    // wire row interactions (selection + per-row action)
+    Array.prototype.forEach.call(box.querySelectorAll('.qrow'),function(r){
+      var k=r.dataset.k;
+      var idx=parseInt(r.dataset.idx,10);
+      var cb=r.querySelector('input[type=checkbox]');
+      cb.addEventListener('click',function(e){
+        if(e.shiftKey&&lastSelIdxA>=0&&lastSelIdxA!==idx){
+          var rowEls=box.querySelectorAll('.qrow');
+          var lo=Math.min(lastSelIdxA,idx),hi=Math.max(lastSelIdxA,idx);
+          var target=cb.checked;
+          for(var i=lo;i<=hi;i++){
+            var rr=rowEls[i];if(!rr)continue;
+            var cc=rr.querySelector('input[type=checkbox]');
+            if(!cc||cc.checked===target)continue;
+            cc.checked=target;
+            var kk=rr.dataset.k;
+            if(target){agentSel.add(kk);rr.classList.add('sel')}
+            else{agentSel.delete(kk);rr.classList.remove('sel')}
+          }
+        }
+        lastSelIdxA=idx;
+      });
+      cb.addEventListener('change',function(){
+        if(cb.checked){agentSel.add(k);r.classList.add('sel')}
+        else{agentSel.delete(k);r.classList.remove('sel')}
+        agRefreshBatch();
+      });
+    });
     Array.prototype.forEach.call(box.querySelectorAll('[data-ag-act]'),function(btn){
       btn.addEventListener('click',function(){
         var r=btn.closest('.qrow');
@@ -1400,7 +1477,26 @@ const SCRIPT = String.raw`
         agentPromoteOne(h,u,target,r);
       });
     });
+    var lm=$('agmore');if(lm)lm.addEventListener('click',loadAgentListMore);
+    var sa=$('selAllA');if(sa)sa.addEventListener('change',function(){
+      if(this.checked)agentRows.forEach(function(a){agentSel.add((a.x_user_id||'')+'|'+a.handle)});
+      else agentRows.forEach(function(a){agentSel.delete((a.x_user_id||'')+'|'+a.handle)});
+      lastSelIdxA=-1;renderAgentList();
+    });
+    agRefreshBatch();
   }
+  function agRefreshBatch(){
+    var b=$('agbatch'),s=$('agselN'),v=$('agvisN'),m=$('selAllA');
+    if(!b)return;
+    var inView=0;for(var i=0;i<agentRows.length;i++){
+      if(agentSel.has((agentRows[i].x_user_id||'')+'|'+agentRows[i].handle))inView++;
+    }
+    if(s)s.textContent=agentSel.size;
+    if(v)v.textContent=agentRows.length;
+    if(m){m.checked=agentRows.length>0&&inView===agentRows.length;m.indeterminate=inView>0&&inView<agentRows.length}
+    b.classList.toggle('on',agentSel.size>0);
+  }
+  function agClearSel(){agentSel.clear();lastSelIdxA=-1;renderAgentList()}
   function agentPromoteOne(handle,xUserId,target,rowEl){
     var body={handle:handle,target:target};
     if(xUserId)body.x_user_id=xUserId;
@@ -1411,7 +1507,8 @@ const SCRIPT = String.raw`
           rowEl.style.opacity='0.4';
           rowEl.style.transition='opacity .25s';
           setTimeout(function(){
-            // Drop from local list and re-render.
+            var k=(xUserId||'')+'|'+handle;
+            agentSel.delete(k);
             agentRows=agentRows.filter(function(x){return x.handle!==handle||(x.x_user_id||'')!==(xUserId||'')});
             renderAgentList();
             refreshStats();
@@ -1420,6 +1517,55 @@ const SCRIPT = String.raw`
           setStatus('操作失败');
         }
       });
+  }
+  function agBatch(target){
+    if(!agentSel.size)return;
+    var label={blacklist:'确认拉黑',whitelist:'确认加白',requeue:'退回待审',reject:'拒绝'}[target]||target;
+    var variant=target==='blacklist'?'danger':target==='whitelist'?'ok':'muted';
+    mxModal.confirm({
+      title:'批量'+label,
+      body:'对已选 <b>'+agentSel.size+'</b> 条 agent 决策执行「'+label+'」？'
+        +(target==='blacklist'?'<br>它们将被升级到公榜（公开拉黑），并以 <code>human:admin</code> 角色记录。':'')
+        +(target==='whitelist'?'<br>它们将进入官方白名单，并以 <code>human:admin</code> 角色记录。':'')
+        +(target==='requeue'?'<br>它们将回到待审队列，下一轮 agent 会重新看。':'')
+        +(target==='reject'?'<br>它们将标记为 rejected，不再出现在 agent 队列里。':''),
+      okLabel:label+' '+agentSel.size+' 条',
+      okVariant:variant
+    }).then(function(ok){
+      if(!ok)return;
+      var ks=Array.from(agentSel);
+      var chunks=chunked(ks,BATCH_CHUNK);
+      setStatus('批量'+label+' 0/'+ks.length);
+      var done=0,idx=0;
+      function nextChunk(){
+        if(idx>=chunks.length){
+          agentSel.clear();lastSelIdxA=-1;
+          setStatus('完成 · '+done+' 条');setTimeout(function(){setStatus('')},2500);
+          loadAgentList(agentBucket);refreshStats();
+          return;
+        }
+        var slice=chunks[idx++];
+        // selToItems returns {handle, xUserId}; agent-promote-batch
+        // expects {handle, x_user_id}, so remap.
+        var items=selToItems(slice).map(function(it){
+          return it.xUserId?{handle:it.handle,x_user_id:it.xUserId}:{handle:it.handle};
+        });
+        api('/v1/admin/agent-promote-batch',{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({target:target,items:items})
+        }).then(function(r){return r.json()}).then(function(j){
+          if(j&&j.ok){
+            done+=slice.length;
+            setStatus('批量'+label+' '+done+'/'+ks.length);
+            nextChunk();
+          } else {
+            setStatus('批量'+label+' 失败');setTimeout(function(){setStatus('')},3000);
+          }
+        });
+      }
+      nextChunk();
+    });
   }
   function loadLog(more){
     var v=$('view');
@@ -1886,6 +2032,7 @@ const SCRIPT = String.raw`
     batch:batch,clearSel:clearSel,
     wlAdd:wlAdd,wlBatch:wlBatch,wlClearSel:wlClearSel,
     blBatch:blBatch,blClearSel:blClearSel,
+    agBatch:agBatch,agClearSel:agClearSel,
     ruleAdd:ruleAdd,rulesApplyAll:rulesApplyAll,
   };
   renderShell();
