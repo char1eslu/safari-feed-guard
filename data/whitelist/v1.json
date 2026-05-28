@@ -1,8 +1,23 @@
 {
   "schema": 1,
-  "generatedAt": 1779969605125,
-  "count": 100,
+  "generatedAt": 1779991251104,
+  "count": 103,
   "list": [
+    {
+      "handle": "nicole_yang88",
+      "x_user_id": "1758831860954902528",
+      "last_scored": 1779983342283
+    },
+    {
+      "handle": "chunxiangai",
+      "x_user_id": "913314383526223872",
+      "last_scored": 1779983274305
+    },
+    {
+      "handle": "iam678",
+      "x_user_id": "222316578",
+      "last_scored": 1779983060039
+    },
     {
       "handle": "macrotradecn",
       "x_user_id": "368205513",
