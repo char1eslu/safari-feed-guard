@@ -296,6 +296,10 @@ input::placeholder{color:var(--fg-4)}
   text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
   font-size:10.5px;color:var(--fg-2);padding:1px 6px;border-radius:var(--r-sm);
   background:var(--card);border:1px solid var(--border)}
+.qrow .who .acct-meta{margin-top:5px;display:flex;flex-wrap:wrap;gap:4px}
+.qrow .who .acct-chip{display:inline-flex;align-items:center;gap:4px;max-width:100%;
+  padding:2px 7px;border-radius:var(--r-sm);font-size:11px;line-height:1.4;color:var(--fg-2);
+  background:var(--card);border:1px solid var(--border);font-variant-numeric:tabular-nums}
 .qrow .who .ev{margin-top:5px;font-size:11.5px;color:var(--fg-2);font-style:italic;
   line-height:1.45;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;
   -webkit-line-clamp:2;-webkit-box-orient:vertical;max-width:560px}
@@ -461,8 +465,10 @@ const SCRIPT = String.raw`
   var queueCursor=null;
   var whitelist=[];
   var wlCursor=null;
+  var wlSearch='';
   var blacklist=[];
   var blCursor=null;
+  var blSearch='';
   var filter='all';
   var sort='severity';
   var sel=new Set();         // queue tab selection
@@ -481,6 +487,29 @@ const SCRIPT = String.raw`
   // prefix filters (uid is prefix, others substring).
   var qFilters={q:'',uid:'',handle:'',evidence:'',display_name:'',reasons:''};
   function fmtN(n){return typeof n==='number'?n.toLocaleString('zh-CN'):'—'}
+  function num(v){return typeof v==='number'?v:(typeof v==='string'&&v!==''&&!isNaN(Number(v))?Number(v):null)}
+  function ymd(ms){var d=new Date(ms);if(!isFinite(d.getTime()))return'';var p=function(n){return String(n).padStart(2,'0')};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
+  function createdChip(a){
+    var raw=(a.account_created_at||'').trim();
+    if(raw){
+      var t=Date.parse(raw);
+      if(!isNaN(t))return {text:ymd(t),title:new Date(t).toLocaleString('zh-CN')};
+      return {text:raw,title:raw};
+    }
+    var age=num(a.account_age_days);
+    if(age==null)return null;
+    var base=num(a.last_scored)||num(a.published_at)||num(a.agent_at)||Date.now();
+    return {text:'约 '+ymd(base-age*86400000),title:'按账龄 '+fmtN(age)+' 天估算'};
+  }
+  function accountMetaHtml(a){
+    var chips=[];
+    var c=createdChip(a);
+    var followers=num(a.followers_count),following=num(a.following_count);
+    if(c&&c.text)chips.push('<span class="acct-chip" title="'+E(c.title)+'">注册 '+E(c.text)+'</span>');
+    if(followers!=null)chips.push('<span class="acct-chip" title="被关注人数">粉丝 '+fmtN(followers)+'</span>');
+    if(following!=null)chips.push('<span class="acct-chip" title="关注人数">关注 '+fmtN(following)+'</span>');
+    return chips.length?'<div class="acct-meta">'+chips.join('')+'</div>':'';
+  }
   // Build the query string for /v1/admin/queue from the current filter state.
   // Empty values are omitted entirely so the URL stays compact and the backend
   // treats them as "no filter on this dimension".
@@ -491,6 +520,12 @@ const SCRIPT = String.raw`
       var v=qFilters[k];
       if(v)parts.push(k+'='+encodeURIComponent(v));
     });
+    return '?'+parts.join('&');
+  }
+  function listQs(cursor,q){
+    var parts=['limit=100'];
+    if(cursor)parts.push('before='+encodeURIComponent(cursor));
+    if(q&&String(q).trim())parts.push('q='+encodeURIComponent(String(q).trim()));
     return '?'+parts.join('&');
   }
   function activeFilterCount(){
@@ -830,6 +865,7 @@ const SCRIPT = String.raw`
       // have to click into x.com on every queue item.
       var evid=(a.evidence_text||'').replace(/\s+/g,' ').trim();
       var evidHtml=evid?'<div class="ev" title="'+E(evid)+'">『'+E(evid.slice(0,90))+(evid.length>90?'…':'')+'』</div>':'';
+      var acctHtml=accountMetaHtml(a);
       return '<div class="qrow '+E(lbl)+(sel.has(k)?' sel':'')+'" data-k="'+E(k)+'" data-idx="'+i+'">'
         +'<input type="checkbox"'+(sel.has(k)?' checked':'')+' aria-label="选中 @'+E(a.handle)+'">'
         +'<div class="av"><img src="'+E(av)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\''+fb+'\'}))"></div>'
@@ -840,6 +876,7 @@ const SCRIPT = String.raw`
             +idChip(a.x_user_id)
             +'<span class="sep">·</span><span>'+ago(a.last_scored)+'</span>'
           +'</div>'
+          +acctHtml
           +evidHtml
         +'</div>'
         +'<div class="conf">'
@@ -1305,6 +1342,8 @@ const SCRIPT = String.raw`
     P3: '回复跑题 + 引流',
     P5: '新号+0粉+促销',
     P6: '黑灰产话术',
+    P7: '头像含促销水印',
+    P8: 'NSFW 头像',
     S1: '账号 <90 天',
     S2: '粉丝 <50',
     S3: '关注/粉丝比异常',
@@ -1414,6 +1453,7 @@ const SCRIPT = String.raw`
       if(ev.x_status&&ev.x_status!=='active'&&ev.x_status!=='unknown')evChips.push('X 状态: '+ev.x_status);
       if(ev.reply_offtopic_ratio!=null)evChips.push('回复跑题率 '+Math.round(ev.reply_offtopic_ratio*100)+'%');
       var nameHtml='<a href="'+E(xUrl(a.handle))+'" target="_blank" rel="noopener">'+E(displayName(a))+'</a>';
+      var acctHtml=accountMetaHtml(a);
       return '<div class="qrow '+E(aLbl)+(agentSel.has(k)?' sel':'')+'" data-k="'+E(k)+'" data-idx="'+i+'" data-h="'+E(a.handle)+'" data-u="'+E(a.x_user_id||'')+'">'
         +'<input type="checkbox"'+(agentSel.has(k)?' checked':'')+' aria-label="选中 @'+E(a.handle)+'">'
         +'<div class="av"><img src="'+E(av)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\''+fb+'\'}))"></div>'
@@ -1426,6 +1466,7 @@ const SCRIPT = String.raw`
             +idChip(a.x_user_id)
             +'<span class="sep">·</span><span title="'+E(new Date(a.agent_at||a.last_scored).toLocaleString('zh-CN'))+'">agent 决策 '+ago(a.agent_at||a.last_scored)+'</span>'
           +'</div>'
+          +acctHtml
           +(signals.length?'<div class="agent-signals">'+signals.map(function(s){return '<span class="agent-sig" title="'+E(s)+'">'+E(humanSignal(s))+'</span>'}).join('')+'</div>':'')
           +(reasons.length?'<div class="agent-reasons">'+reasons.slice(0,4).map(function(r){return '<span>· '+E(r)+'</span>'}).join('')+'</div>':'')
           +(evChips.length?'<div class="agent-evidence">'+evChips.map(function(c){return '<span class="agent-evc">'+E(c)+'</span>'}).join('')+'</div>':'')
@@ -1612,9 +1653,9 @@ const SCRIPT = String.raw`
   }
 
   function loadWhitelist(more){
-    if(!more){whitelist=[];wlCursor=null}
+    if(!more){whitelist=[];wlCursor=null;wlSel.clear();lastSelIdxW=-1}
     setStatus('加载中…');
-    api('/v1/admin/whitelist?limit=100'+(wlCursor?'&before='+wlCursor:'')).then(function(r){
+    api('/v1/admin/whitelist'+listQs(wlCursor,wlSearch)).then(function(r){
       if(r.status===403){TOK='';localStorage.removeItem('xss_admin');renderLocked();return null}
       return r.json();
     }).then(function(j){
@@ -1630,11 +1671,20 @@ const SCRIPT = String.raw`
   function renderWhitelist(){
     var v=$('view');
     var totalLbl=(stats&&stats.whitelist!=null)?fmtN(stats.whitelist):(whitelist.length+(wlCursor?'+':''));
+    var searching=!!wlSearch;
     v.innerHTML=
       '<div class="toolbar">'
-        +'<div class="status">共 <b style="color:var(--fg)">'+totalLbl+'</b> 个白名单账号 · 它们不会再被 AI 扫描，也不接受举报</div>'
+        +'<div class="status">共 <b style="color:var(--fg)">'+totalLbl+'</b> 个白名单账号 · 它们不会再被 AI 扫描，也不接受举报'
+          +(searching?' · 当前搜索 <b style="color:var(--fg)">'+E(wlSearch)+'</b>':'')+'</div>'
         +'<div class="r">'
           +'<button class="btn sm primary" onclick="window.__xss.wlAdd()">+ 加入白名单</button>'
+        +'</div>'
+      +'</div>'
+      +'<div class="search-bar">'
+        +'<div class="search-row">'
+          +'<input id="wlSearch" class="search-input" value="'+E(wlSearch)+'" placeholder="搜索白名单 handle / uid / 显示名 / 备注 …">'
+          +'<button class="btn sm" id="wlSearchBtn">搜索</button>'
+          +(wlSearch?'<button class="btn sm muted" id="wlSearchClear">清除</button>':'')
         +'</div>'
       +'</div>'
       +'<div class="batch" id="wlbatch">'
@@ -1650,16 +1700,23 @@ const SCRIPT = String.raw`
       +'<div class="rows" id="wlrows"></div>'
       +'<div class="more-foot" id="wmoreFoot">'
         +(wlCursor?'<button class="btn sm" id="wlmore">加载更多</button>':'')
-        +(stats.whitelist!=null?'<span>'+(wlCursor?'已加载 '+fmtN(whitelist.length)+' / 共 '+fmtN(stats.whitelist):'已加载全部 '+fmtN(whitelist.length))+' 条</span>':'')
+        +(searching?'<span>'+(wlCursor?'已加载 '+fmtN(whitelist.length)+' 条匹配':'已加载全部 '+fmtN(whitelist.length)+' 条匹配')+'</span>'
+          :(stats.whitelist!=null?'<span>'+(wlCursor?'已加载 '+fmtN(whitelist.length)+' / 共 '+fmtN(stats.whitelist):'已加载全部 '+fmtN(whitelist.length))+' 条</span>':''))
       +'</div>';
     var box=$('wlrows');
-    if(!whitelist.length){box.innerHTML='<div class="empty">还没有白名单账号。<br><br>点击右上角 <b>+ 加入白名单</b>，或在「待审队列」对某行点 <b>白名单</b> 按钮把它直接挪过来。</div>';wlRefreshBatch();return}
+    var wli=$('wlSearch');
+    function commitWlSearch(){wlSearch=(wli&&wli.value||'').trim();loadWhitelist(false)}
+    if(wli)wli.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();commitWlSearch()}});
+    var wlb=$('wlSearchBtn');if(wlb)wlb.addEventListener('click',commitWlSearch);
+    var wlc=$('wlSearchClear');if(wlc)wlc.addEventListener('click',function(){wlSearch='';loadWhitelist(false)});
+    if(!whitelist.length){box.innerHTML='<div class="empty">'+(searching?'没有匹配的白名单账号。':'还没有白名单账号。<br><br>点击右上角 <b>+ 加入白名单</b>，或在「待审队列」对某行点 <b>白名单</b> 按钮把它直接挪过来。')+'</div>';wlRefreshBatch();return}
     box.innerHTML=whitelist.map(function(a,i){
       var k=(a.x_user_id||'')+'|'+a.handle;
       var av=a.avatar_url||('https://unavatar.io/twitter/'+encodeURIComponent(a.handle));
       var fb=E((a.handle||'?').slice(0,1).toUpperCase());
       var note='';
       try{var rs=JSON.parse(a.reasons||'[]');note=Array.isArray(rs)?rs.filter(function(x){return x&&x!=='whitelisted by admin'}).join(' · '):''}catch(e){}
+      var acctHtml=accountMetaHtml(a);
       return '<div class="qrow legit'+(wlSel.has(k)?' sel':'')+'" data-k="'+E(k)+'" data-idx="'+i+'" data-h="'+E(a.handle)+'" data-u="'+E(a.x_user_id||'')+'">'
         +'<input type="checkbox"'+(wlSel.has(k)?' checked':'')+' aria-label="选中 @'+E(a.handle)+'">'
         +'<div class="av"><img src="'+E(av)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\''+fb+'\'}))"></div>'
@@ -1672,6 +1729,7 @@ const SCRIPT = String.raw`
             +(note?'<span class="sep">·</span><span>'+E(note)+'</span>':'')
             +'<span class="sep">·</span><span title="'+E(new Date(a.last_decided_at||a.last_scored).toLocaleString('zh-CN'))+'">加入 '+ago(a.last_decided_at||a.last_scored)+'</span>'
           +'</div>'
+          +acctHtml
         +'</div>'
         +'<span></span><span></span>'
         +'<div class="acts">'
@@ -1768,7 +1826,7 @@ const SCRIPT = String.raw`
   function loadBlacklist(more){
     if(!more){blacklist=[];blCursor=null;blSel.clear()}
     setStatus('加载中…');
-    api('/v1/admin/blacklist?limit=100'+(blCursor?'&before='+blCursor:'')).then(function(r){
+    api('/v1/admin/blacklist'+listQs(blCursor,blSearch)).then(function(r){
       if(r.status===403){TOK='';localStorage.removeItem('xss_admin');renderLocked();return null}
       return r.json();
     }).then(function(j){
@@ -1784,9 +1842,18 @@ const SCRIPT = String.raw`
   function renderBlacklist(){
     var v=$('view');
     var totalLbl=(stats&&stats.blacklist!=null)?fmtN(stats.blacklist):(blacklist.length+(blCursor?'+':''));
+    var searching=!!blSearch;
     v.innerHTML=
       '<div class="toolbar">'
-        +'<div class="status">共 <b style="color:var(--fg)">'+totalLbl+'</b> 个已公榜账号 · 在 <a href="/list" target="_blank">/list</a> 公开可见 · 误判直接 → 白名单 / 驳回</div>'
+        +'<div class="status">共 <b style="color:var(--fg)">'+totalLbl+'</b> 个已公榜账号 · 在 <a href="/list" target="_blank">/list</a> 公开可见 · 误判直接 → 白名单 / 驳回'
+          +(searching?' · 当前搜索 <b style="color:var(--fg)">'+E(blSearch)+'</b>':'')+'</div>'
+      +'</div>'
+      +'<div class="search-bar">'
+        +'<div class="search-row">'
+          +'<input id="blSearch" class="search-input" value="'+E(blSearch)+'" placeholder="搜索黑名单 handle / uid / 显示名 / 证据 / 理由 …">'
+          +'<button class="btn sm" id="blSearchBtn">搜索</button>'
+          +(blSearch?'<button class="btn sm muted" id="blSearchClear">清除</button>':'')
+        +'</div>'
       +'</div>'
       +'<div class="batch" id="blbatch">'
         +'<label class="meta" title="全选已加载范围。Shift+点 可在两次勾选间一次性勾选范围">'
@@ -1803,10 +1870,16 @@ const SCRIPT = String.raw`
       +'<div class="rows" id="blrows"></div>'
       +'<div class="more-foot" id="bmoreFoot">'
         +(blCursor?'<button class="btn sm" id="blmore">加载更多</button>':'')
-        +(stats.blacklist!=null?'<span>'+(blCursor?'已加载 '+fmtN(blacklist.length)+' / 共 '+fmtN(stats.blacklist):'已加载全部 '+fmtN(blacklist.length))+' 条</span>':'')
+        +(searching?'<span>'+(blCursor?'已加载 '+fmtN(blacklist.length)+' 条匹配':'已加载全部 '+fmtN(blacklist.length)+' 条匹配')+'</span>'
+          :(stats.blacklist!=null?'<span>'+(blCursor?'已加载 '+fmtN(blacklist.length)+' / 共 '+fmtN(stats.blacklist):'已加载全部 '+fmtN(blacklist.length))+' 条</span>':''))
       +'</div>';
     var box=$('blrows');
-    if(!blacklist.length){box.innerHTML='<div class="empty">公榜还没有账号。<br><br>在「待审队列」点 <b style="color:var(--danger)">拉黑</b> 把判定结果送进公榜。</div>';blRefreshBatch();return}
+    var bli=$('blSearch');
+    function commitBlSearch(){blSearch=(bli&&bli.value||'').trim();loadBlacklist(false)}
+    if(bli)bli.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();commitBlSearch()}});
+    var blb=$('blSearchBtn');if(blb)blb.addEventListener('click',commitBlSearch);
+    var blc=$('blSearchClear');if(blc)blc.addEventListener('click',function(){blSearch='';loadBlacklist(false)});
+    if(!blacklist.length){box.innerHTML='<div class="empty">'+(searching?'没有匹配的黑名单账号。':'公榜还没有账号。<br><br>在「待审队列」点 <b style="color:var(--danger)">拉黑</b> 把判定结果送进公榜。')+'</div>';blRefreshBatch();return}
     box.innerHTML=blacklist.map(function(a,i){
       var k=(a.x_user_id||'')+'|'+a.handle;
       var av=a.avatar_url||('https://unavatar.io/twitter/'+encodeURIComponent(a.handle));
@@ -1815,6 +1888,7 @@ const SCRIPT = String.raw`
       var lbl=a.verdict_label||'spam';
       var lblZh={spam:'垃圾营销',porn_bot:'色情广告',likely_spam:'疑似垃圾',uncertain:'不确定',legit:'正常'}[lbl]||lbl;
       var reps=a.reporters||0;
+      var acctHtml=accountMetaHtml(a);
       return '<div class="qrow '+E(lbl)+(blSel.has(k)?' sel':'')+'" data-k="'+E(k)+'" data-idx="'+i+'" data-h="'+E(a.handle)+'" data-u="'+E(a.x_user_id||'')+'">'
         +'<input type="checkbox"'+(blSel.has(k)?' checked':'')+' aria-label="选中 @'+E(a.handle)+'">'
         +'<div class="av"><img src="'+E(av)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\''+fb+'\'}))"></div>'
@@ -1827,6 +1901,7 @@ const SCRIPT = String.raw`
             +'<span class="sep">·</span><span title="'+E(new Date(a.published_at||a.last_decided_at).toLocaleString('zh-CN'))+'">已公榜 '+ago(a.published_at)+'</span>'
             +(a.last_decided_at&&a.last_decided_at!==a.published_at?'<span class="sep">·</span><span title="'+E(new Date(a.last_decided_at).toLocaleString('zh-CN'))+'">决策 '+ago(a.last_decided_at)+'</span>':'')
           +'</div>'
+          +acctHtml
         +'</div>'
         +'<div class="conf"><div class="pct">'+conf+'%<span class="lbl">把握</span></div></div>'
         +'<div class="rep">'+(reps>=3?'<span class="chip-ok">'+reps+' 人 ✓</span>':'<span>'+reps+' 人</span>')+'</div>'
