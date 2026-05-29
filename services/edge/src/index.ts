@@ -656,29 +656,17 @@ async function matchKeywordRules(env: Env, s: Signals): Promise<KeywordRule | nu
   return null;
 }
 
-// Strong-position fields: a keyword match here is high-precision enough to
-// publish directly. Free-text fields (bio/tweet/any) are NOT — a bare
-// substring in free text is too false-positive-prone to auto-publish (e.g. a
-// user quoting/mocking spam, or a generic word like "主页"/"资源"/"同城"
-// embedded in a normal sentence), so those route to the review queue instead.
-function isStrongRuleField(field: string): boolean {
-  return field === "handle" || field === "display_name";
-}
-
-// Map a rule hit to the accounts-table `status` the row should land in.
-// A 'blacklist' rule publishes directly (human_confirmed) ONLY when it matched
-// a strong field AND we know the immutable uid. Without the uid a renamed
-// whitelisted/exonerated account can't be reliably re-identified (findAccount
-// would miss the protected row), so we must not auto-publish — downgrade to the
-// review queue. Free-text-field matches always go to the queue.
-function statusForRuleHit(
-  rule: { action: string; field: string },
-  hasUid: boolean,
-): "human_confirmed" | "whitelisted" | "rejected" | "auto_pending_review" {
-  if (rule.action === "whitelist") return "whitelisted";
-  if (rule.action === "reject") return "rejected";
-  // 'blacklist' (default)
-  return isStrongRuleField(rule.field) && hasUid ? "human_confirmed" : "auto_pending_review";
+// Map a rule's `action` to the accounts table `status` the row should land in.
+// A 'blacklist' hit publishes directly to the public list — keyword rules are
+// maintainer-curated and trusted to be high-precision (the maintainer picks
+// specific, non-generic phrases). The audit log records actor='rule:<id>' so
+// any hit is traceable, and writeAccount still preserves an existing
+// human_confirmed/rejected/removed/whitelisted status, so a rule can never
+// override a prior human decision on the same account.
+function statusForRuleAction(action: string): "human_confirmed" | "whitelisted" | "rejected" {
+  if (action === "whitelist") return "whitelisted";
+  if (action === "reject") return "rejected";
+  return "human_confirmed"; // 'blacklist' default
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -761,14 +749,13 @@ app.post("/v1/classify", async (c) => {
     });
   }
   // Fast-path: keyword rules. Match before spending an LLM call. A hit routes
-  // the account to the status from statusForRuleHit: strong-field blacklist
-  // hits with a known uid publish directly ('human_confirmed'); free-text or
-  // uid-less hits go to the review queue ('auto_pending_review') instead of the
-  // public list. The audit log records actor='rule:<id>' so any hit is traceable.
+  // the account straight to the rule's destination status (default 'blacklist'
+  // → 'human_confirmed' on the public list). The audit log records
+  // actor='rule:<id>' so any hit is traceable.
   const ruleHit = await matchKeywordRules(c.env, s);
   if (ruleHit) {
     const now = Date.now();
-    const status = statusForRuleHit(ruleHit, uid != null);
+    const status = statusForRuleAction(ruleHit.action);
     const reasons = [`matched keyword rule "${ruleHit.pattern}" on ${ruleHit.field}`];
     const verdict = {
       label: ruleHit.verdict_label,
@@ -1634,7 +1621,7 @@ app.post("/v1/admin/keyword-rules/apply-to-queue", async (c) => {
     if (!hit) continue;
     totalHit++;
     perRule[hit.id] = (perRule[hit.id] ?? 0) + 1;
-    const status = statusForRuleHit(hit, row.x_user_id != null);
+    const status = statusForRuleAction(hit.action);
     if (hit.action === "whitelist") {
       stmts.push(
         c.env.DB.prepare(
