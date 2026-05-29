@@ -1,8 +1,48 @@
 {
   "schema": 1,
-  "generatedAt": 1780034451217,
-  "count": 106,
+  "generatedAt": 1780056057696,
+  "count": 114,
   "list": [
+    {
+      "handle": "yanliudreamer",
+      "x_user_id": "2060058261379063808",
+      "last_scored": 1780050264599
+    },
+    {
+      "handle": "bai_agi",
+      "x_user_id": "1392094167522742272",
+      "last_scored": 1780049795399
+    },
+    {
+      "handle": "randgroup",
+      "x_user_id": "859484337850523648",
+      "last_scored": 1780049716340
+    },
+    {
+      "handle": "claudedevs",
+      "x_user_id": "2024518793679294464",
+      "last_scored": 1780049640220
+    },
+    {
+      "handle": "wolfyxbt",
+      "x_user_id": "1516941936971554817",
+      "last_scored": 1780049601511
+    },
+    {
+      "handle": "coolish",
+      "x_user_id": "28754022",
+      "last_scored": 1780036094091
+    },
+    {
+      "handle": "adrianpunk115",
+      "x_user_id": "2047631450829471745",
+      "last_scored": 1780036029815
+    },
+    {
+      "handle": "li665508li",
+      "x_user_id": "1865705903640698881",
+      "last_scored": 1780035992251
+    },
     {
       "handle": "russell3402",
       "x_user_id": "1991045969371361280",
