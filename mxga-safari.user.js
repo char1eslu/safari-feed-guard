@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Safari Feed Guard
+// @name         Feed Guard
 // @namespace    https://github.com/char1eslu/make-x-great-again
-// @version      0.4.0-safari.4
+// @version      0.4.0-safari.5
 // @description  Safari/Tampermonkey userscript with inline labels, local cache, remote checks, and a paced action queue.
 // @author       char1eslu
 // @license      AGPL-3.0-only
@@ -34,7 +34,7 @@
   "use strict";
 
   const BRAND = {
-    name: "Safari Feed Guard",
+    name: "Feed Guard",
     acronym: "SFG",
     edgeBase: "https://x.zuoluo.tv",
     repo: "https://github.com/foru17/make-x-great-again",
@@ -1344,10 +1344,10 @@
     }
     * { box-sizing: border-box; font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
     .mxga-bubble {
-      position: fixed; right: 16px; top: 16px; z-index: 2147483000;
+      position: fixed; right: 16px; top: 96px; z-index: 2147483000;
       color: var(--mxga-text); -webkit-font-smoothing: antialiased;
     }
-    .mxga-bubble.br { top: auto; bottom: 16px; }
+    .mxga-bubble.br { top: auto; bottom: 96px; }
     .pill, .panel, .modal {
       background: var(--mxga-panel); border: 1px solid var(--mxga-border);
       box-shadow: var(--mxga-shadow); backdrop-filter: blur(18px) saturate(1.25); -webkit-backdrop-filter: blur(18px) saturate(1.25);
