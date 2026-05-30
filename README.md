@@ -1,4 +1,4 @@
-# Safari Userscript Distribution
+# Safari Feed Guard
 
 This repository publishes a single Safari/Tampermonkey userscript.
 
@@ -6,7 +6,7 @@ This repository publishes a single Safari/Tampermonkey userscript.
 
 Open this link in Safari with Tampermonkey enabled:
 
-**[Install / update userscript](https://raw.githubusercontent.com/char1eslu/safari-feed-guard/main/feed-guard.user.js)**
+**[Install / update userscript](https://raw.githubusercontent.com/char1eslu/safari-feed-guard/main/safari-feed-guard.user.js)**
 
 Tampermonkey should detect the `.user.js` file and show an install or update page.
 
@@ -18,5 +18,5 @@ After editing the script, bump the `@version` value near the top of the file. Ta
 
 ## Files
 
-- `feed-guard.user.js` - the installable userscript
+- `safari-feed-guard.user.js` - the installable userscript
 - `LICENSE` - license notice

@@ -1,14 +1,14 @@
 // ==UserScript==
-// @name         Feed Guard
+// @name         Safari Feed Guard
 // @namespace    https://github.com/char1eslu/safari-feed-guard
-// @version      0.4.0-safari.5
+// @version      0.4.0-safari.6
 // @description  Safari/Tampermonkey userscript with inline labels, local cache, remote checks, and a paced action queue.
 // @author       char1eslu
 // @license      AGPL-3.0-only
 // @homepageURL  https://github.com/char1eslu/safari-feed-guard
 // @supportURL   https://github.com/char1eslu/safari-feed-guard/issues
-// @downloadURL  https://raw.githubusercontent.com/char1eslu/safari-feed-guard/main/feed-guard.user.js
-// @updateURL    https://raw.githubusercontent.com/char1eslu/safari-feed-guard/main/feed-guard.user.js
+// @downloadURL  https://raw.githubusercontent.com/char1eslu/safari-feed-guard/main/safari-feed-guard.user.js
+// @updateURL    https://raw.githubusercontent.com/char1eslu/safari-feed-guard/main/safari-feed-guard.user.js
 // @match        https://x.com/*
 // @match        https://twitter.com/*
 // @run-at       document-start
@@ -34,7 +34,7 @@
   "use strict";
 
   const BRAND = {
-    name: "Feed Guard",
+    name: "Safari Feed Guard",
     acronym: "SFG",
     edgeBase: "https://x.zuoluo.tv",
     repo: "https://github.com/char1eslu/safari-feed-guard",
