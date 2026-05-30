@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Safari Feed Guard
 // @namespace    https://github.com/char1eslu/safari-feed-guard
-// @version      0.4.0-safari.6
-// @description  Safari/Tampermonkey userscript with inline labels, local cache, remote checks, and a paced action queue.
+// @version      0.4.0-safari.7
+// @description  Safari/Tampermonkey userscript with bilingual UI, inline labels, local cache, remote checks, and a paced action queue.
 // @author       char1eslu
 // @license      AGPL-3.0-only
 // @homepageURL  https://github.com/char1eslu/safari-feed-guard
@@ -66,19 +66,317 @@
     edgeBase: "",
     autoExpandOnFinding: true,
     autoBlockListHits: false,
+    language: "auto",
   };
+
+  let currentSettings;
 
   const DAY = 86_400_000;
   const REFRESH_MS = 6 * 3600_000;
   const AUTO_THRESHOLD = 0.5;
 
   const LABEL = {
-    spam: { zh: "垃圾", color: "#ef4444", short: "垃圾" },
-    porn_bot: { zh: "色情bot", color: "#ef4444", short: "色情" },
-    likely_spam: { zh: "疑似垃圾", color: "#f59e0b", short: "疑似" },
-    uncertain: { zh: "不确定", color: "#64748b", short: "存疑" },
-    legit: { zh: "正常", color: "#16a34a", short: "正常" },
+    spam: { zh: "垃圾", en: "Spam", color: "#ef4444", short: "垃圾", shortEn: "Spam" },
+    porn_bot: { zh: "色情bot", en: "Porn bot", color: "#ef4444", short: "色情", shortEn: "Porn" },
+    likely_spam: { zh: "疑似垃圾", en: "Likely spam", color: "#f59e0b", short: "疑似", shortEn: "Likely" },
+    uncertain: { zh: "不确定", en: "Uncertain", color: "#64748b", short: "存疑", shortEn: "Maybe" },
+    legit: { zh: "正常", en: "Legit", color: "#16a34a", short: "正常", shortEn: "Legit" },
   };
+
+  const I18N = {
+    "zh-CN": {
+      auto: "自动",
+      simplifiedChinese: "简中",
+      english: "English",
+      off: "已关闭",
+      blockingProgress: "拉黑中 {done}/{total}",
+      hits: "命中 {count}",
+      scanning: "扫描 {count}",
+      scanned: "已扫 {count}",
+      guard: "守护",
+      enabledTitle: "{brand} 已启用",
+      metricScanned: "已扫",
+      metricAnalyzing: "分析",
+      metricPublic: "公榜",
+      metricConfirmed: "确认",
+      metricHits: "命中",
+      metricActive: "正在",
+      metricQueued: "待拉",
+      metricBlocked: "已拉",
+      emptyPanel: "正在被动检查本页账号。发现可疑垃圾号时会显示在这里，并可一键拉黑。",
+      refreshWhitelist: "刷新白名单",
+      governanceRules: "治理规则",
+      pageHitsTitle: "本页命中 {count} 个账号",
+      blockAllPending: "一键拉黑未处理 {count}",
+      jumpFirst: "跳到第一个",
+      ignorePage: "忽略本页",
+      blockedWithSource: "已拉黑{source}",
+      blockingWithSource: "正在后台拉黑{source}",
+      queuedWithSource: "待后台拉黑{source}",
+      blockFailed: "拉黑失败，可重试或手动处理",
+      blocked: "已拉黑",
+      retry: "重试",
+      block: "拉黑",
+      sourceManual: "手动",
+      sourceBatch: "批量",
+      sourcePublicAuto: "公榜自动",
+      sourceCacheAuto: "缓存自动",
+      syncing: "同步中",
+      synced: "已同步",
+      settingsTitle: "{brand} 设置",
+      language: "语言",
+      languageHint: "选择界面语言。",
+      enabledDetection: "启用检测",
+      enabledDetectionHint: "关闭后不扫描页面。",
+      bubbleVisible: "显示右上角气泡",
+      bubbleVisibleHint: "隐藏后仍可从油猴菜单打开设置。",
+      replyAuto: "回复区自动检查",
+      replyAutoHint: "在回复页降低启发式阈值，覆盖更隐蔽的账号。",
+      autoExpand: "命中后自动展开",
+      autoExpandHint: "发现可疑账号时自动弹出处理面板。",
+      autoBlockHits: "自动拉黑公榜/缓存命中",
+      autoBlockHitsHint: "危险选项：命中公榜或本机历史垃圾缓存时静默加入拉黑队列。",
+      bubblePosition: "气泡位置",
+      bubblePositionHint: "右上或右下。",
+      topRight: "右上",
+      bottomRight: "右下",
+      edgeApi: "Edge API 地址",
+      edgeApiHint: "留空使用 {url}",
+      githubLogin: "GitHub 登录",
+      githubCurrent: "当前：{login}",
+      githubLoginHint: "登录后可上报和确认垃圾账号。",
+      login: "登录",
+      logout: "退出",
+      whitelistCache: "白名单缓存",
+      whitelistStatus: "{count} 条，{time}",
+      neverSynced: "尚未同步",
+      localStats: "本地统计",
+      localStatsLine: "AI {ai} · 公榜 {public} · 确认 {confirmed} · 拉黑 {blocks}",
+      clear: "清空",
+      privacy: "隐私说明",
+      safariNote: "Safari 油猴版是单文件脚本；目标页面结构变动时可能需要更新。",
+      refreshing: "刷新中",
+      clearConfirm: "清空 SFG 的本地缓存、队列、登录态和统计？",
+      githubLoginStartFailed: "GitHub 登录启动失败：{error}",
+      githubDeviceFlow: "GitHub Device Flow",
+      githubDeviceHint: "打开 GitHub 输入验证码：{code}",
+      openVerification: "打开验证页",
+      waitingAuth: "等待授权...",
+      loggedInAs: "已登录：{login}",
+      waitingAuthDetail: "等待授权... {detail}",
+      statusBlocking: "屏蔽中",
+      statusAnalyzing: "分析",
+      statusQueued: "排队",
+      whitelist: "白名单",
+      handle: "处理",
+      check: "检查",
+      badgePublic: "公榜",
+      badgeCache: "缓存",
+      manualTitle: "手动处理",
+      manualHint: "未命中时可主动检查、上报或拉黑并上报。",
+      report: "上报",
+      blockAndReport: "拉黑并上报",
+      reporting: "上报中",
+      reported: "已上报",
+      failed: "失败",
+      sourcePublicConfirmed: "公榜确认",
+      sourceLocalCache: "本地缓存",
+      sourceAiLive: "AI 现场判定",
+      noDetailedReason: "无详细理由",
+      hide: "隐藏",
+      appeal: "误判?",
+      reportFailed: "上报失败",
+      classifyFailed: "分类失败",
+      idFallback: "数字ID未解析，handle 兜底",
+      menuSettings: "SFG 设置",
+      menuToggle: "SFG 切换启用/关闭",
+      menuRefreshWhitelist: "SFG 刷新白名单",
+      reasonReplyTemplate: "导流模板：短中文回复 + @mention + (emoji|性暗示)",
+      reasonDefaultAvatar: "默认头像",
+      reasonNewAccount30: "新注册账号(<30天)",
+      reasonNewAccount90: "较新账号(<90天)",
+      reasonOldAccount: "老账号(>2年)",
+      reasonNoFollowers: "几乎无粉丝",
+      reasonPromoText: "导流/性广告话术",
+      reasonSuspiciousLink: "外链/可疑域名",
+      reasonRandomHandle: "机器生成式 handle",
+    },
+    en: {
+      auto: "Auto",
+      simplifiedChinese: "简中",
+      english: "English",
+      off: "Off",
+      blockingProgress: "Blocking {done}/{total}",
+      hits: "{count} hits",
+      scanning: "Scanning {count}",
+      scanned: "Scanned {count}",
+      guard: "Guard",
+      enabledTitle: "{brand} enabled",
+      metricScanned: "Scanned",
+      metricAnalyzing: "Analysis",
+      metricPublic: "Public",
+      metricConfirmed: "Confirmed",
+      metricHits: "Hits",
+      metricActive: "Active",
+      metricQueued: "Queued",
+      metricBlocked: "Blocked",
+      emptyPanel: "Passively checking accounts on this page. Suspicious accounts will appear here for one-click blocking.",
+      refreshWhitelist: "Refresh whitelist",
+      governanceRules: "Rules",
+      pageHitsTitle: "{count} accounts flagged",
+      blockAllPending: "Block pending {count}",
+      jumpFirst: "First hit",
+      ignorePage: "Ignore page",
+      blockedWithSource: "Blocked{source}",
+      blockingWithSource: "Blocking in background{source}",
+      queuedWithSource: "Queued for blocking{source}",
+      blockFailed: "Block failed. Retry or handle manually.",
+      blocked: "Blocked",
+      retry: "Retry",
+      block: "Block",
+      sourceManual: "manual",
+      sourceBatch: "batch",
+      sourcePublicAuto: "public auto",
+      sourceCacheAuto: "cache auto",
+      syncing: "Syncing",
+      synced: "Synced",
+      settingsTitle: "{brand} Settings",
+      language: "Language",
+      languageHint: "Choose the interface language.",
+      enabledDetection: "Enable detection",
+      enabledDetectionHint: "Stops scanning when disabled.",
+      bubbleVisible: "Show floating bubble",
+      bubbleVisibleHint: "When hidden, settings remain available from the Tampermonkey menu.",
+      replyAuto: "Auto-check replies",
+      replyAutoHint: "Lowers the heuristic threshold on reply pages to catch subtler accounts.",
+      autoExpand: "Auto-open on hit",
+      autoExpandHint: "Opens the action panel when a suspicious account is found.",
+      autoBlockHits: "Auto-block public/cache hits",
+      autoBlockHitsHint: "Risky option: silently queues public-list or local-cache hits for blocking.",
+      bubblePosition: "Bubble position",
+      bubblePositionHint: "Top right or bottom right.",
+      topRight: "Top right",
+      bottomRight: "Bottom right",
+      edgeApi: "Edge API URL",
+      edgeApiHint: "Leave blank to use {url}",
+      githubLogin: "GitHub login",
+      githubCurrent: "Current: {login}",
+      githubLoginHint: "Log in to report and confirm spam accounts.",
+      login: "Log in",
+      logout: "Log out",
+      whitelistCache: "Whitelist cache",
+      whitelistStatus: "{count} entries, {time}",
+      neverSynced: "never synced",
+      localStats: "Local stats",
+      localStatsLine: "AI {ai} · public {public} · confirmed {confirmed} · blocked {blocks}",
+      clear: "Clear",
+      privacy: "Privacy",
+      safariNote: "The Safari userscript is a single-file port; page structure changes may require an update.",
+      refreshing: "Refreshing",
+      clearConfirm: "Clear SFG local cache, queue, login state, and stats?",
+      githubLoginStartFailed: "GitHub login failed to start: {error}",
+      githubDeviceFlow: "GitHub Device Flow",
+      githubDeviceHint: "Open GitHub and enter this code: {code}",
+      openVerification: "Open verification",
+      waitingAuth: "Waiting for authorization...",
+      loggedInAs: "Logged in as {login}",
+      waitingAuthDetail: "Waiting for authorization... {detail}",
+      statusBlocking: "Blocking",
+      statusAnalyzing: "Analyzing",
+      statusQueued: "Queued",
+      whitelist: "Whitelist",
+      handle: "Handle",
+      check: "Check",
+      badgePublic: "Public",
+      badgeCache: "Cache",
+      manualTitle: "Manual action",
+      manualHint: "When there is no hit, you can check, report, or block and report manually.",
+      report: "Report",
+      blockAndReport: "Block and report",
+      reporting: "Reporting",
+      reported: "Reported",
+      failed: "Failed",
+      sourcePublicConfirmed: "Public list",
+      sourceLocalCache: "Local cache",
+      sourceAiLive: "AI live verdict",
+      noDetailedReason: "No detailed reason",
+      hide: "Hide",
+      appeal: "False positive?",
+      reportFailed: "Report failed",
+      classifyFailed: "Classification failed",
+      idFallback: "Numeric ID not resolved; falling back to handle.",
+      menuSettings: "SFG Settings",
+      menuToggle: "SFG Toggle on/off",
+      menuRefreshWhitelist: "SFG Refresh whitelist",
+      reasonReplyTemplate: "Traffic pattern: short Chinese reply + @mention + (emoji or innuendo)",
+      reasonDefaultAvatar: "Default avatar",
+      reasonNewAccount30: "New account (<30 days)",
+      reasonNewAccount90: "Recent account (<90 days)",
+      reasonOldAccount: "Established account (>2 years)",
+      reasonNoFollowers: "Almost no followers",
+      reasonPromoText: "Promotional or sexual-ad wording",
+      reasonSuspiciousLink: "External link or suspicious domain",
+      reasonRandomHandle: "Machine-generated handle",
+    },
+  };
+
+  const REASON_KEYS = {
+    "导流模板：短中文回复 + @mention + (emoji|性暗示)": "reasonReplyTemplate",
+    默认头像: "reasonDefaultAvatar",
+    "新注册账号(<30天)": "reasonNewAccount30",
+    "较新账号(<90天)": "reasonNewAccount90",
+    "老账号(>2年)": "reasonOldAccount",
+    几乎无粉丝: "reasonNoFollowers",
+    "导流/性广告话术": "reasonPromoText",
+    "外链/可疑域名": "reasonSuspiciousLink",
+    "机器生成式 handle": "reasonRandomHandle",
+    reasonReplyTemplate: "reasonReplyTemplate",
+    reasonDefaultAvatar: "reasonDefaultAvatar",
+    reasonNewAccount30: "reasonNewAccount30",
+    reasonNewAccount90: "reasonNewAccount90",
+    reasonOldAccount: "reasonOldAccount",
+    reasonNoFollowers: "reasonNoFollowers",
+    reasonPromoText: "reasonPromoText",
+    reasonSuspiciousLink: "reasonSuspiciousLink",
+    reasonRandomHandle: "reasonRandomHandle",
+  };
+
+  function uiLang() {
+    const raw = currentSettings?.language || DEFAULT_SETTINGS.language;
+    if (raw === "zh-CN" || raw === "en") return raw;
+    const nav = typeof navigator === "object" ? navigator.language || "" : "";
+    return /^zh(?:-|_|$)/i.test(nav) ? "zh-CN" : "en";
+  }
+
+  function t(key, vars = {}) {
+    const dict = I18N[uiLang()] || I18N["zh-CN"];
+    const template = dict[key] || I18N["zh-CN"][key] || key;
+    return template.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? ""));
+  }
+
+  function labelMeta(label) {
+    return LABEL[label] || LABEL.uncertain;
+  }
+
+  function labelText(label) {
+    const meta = labelMeta(label);
+    return uiLang() === "en" ? meta.en : meta.zh;
+  }
+
+  function labelShort(label) {
+    const meta = labelMeta(label);
+    return uiLang() === "en" ? meta.shortEn : meta.short;
+  }
+
+  function reasonText(reason) {
+    const key = REASON_KEYS[reason];
+    return key ? t(key) : String(reason || "");
+  }
+
+  function formatDateTime(ts) {
+    if (!ts) return t("neverSynced");
+    return new Date(ts).toLocaleString(uiLang() === "en" ? "en-US" : "zh-CN");
+  }
 
   const PROMO_RE =
     /(约见|约炮|附近|同城|牵线|线下|对接|资源|上车|看我主页|入驻|女主播|安全可靠|大号|解锁|福利|楼凤|一夜|加微|私聊|私信|包养|外围|18\+|🔞|🍑|💋|💦|👇|👉)/;
@@ -219,6 +517,7 @@
     const settings = getSettings();
     gmSet(SETTINGS_KEY, { ...settings, [k]: v });
     currentSettings = getSettings();
+    if (bubbleShadow) renderBubble();
     updateBubbleVisibility();
     renderSettingsIfOpen();
     scanSoon(0);
@@ -1135,39 +1434,39 @@
       (EMOJI_RE.test(t) || INNUENDO_RE.test(t));
     if (shapeMatch) {
       score += 0.4;
-      why.push("导流模板：短中文回复 + @mention + (emoji|性暗示)");
+      why.push("reasonReplyTemplate");
     }
     if (s.hasDefaultAvatar) {
       score += 0.35;
-      why.push("默认头像");
+      why.push("reasonDefaultAvatar");
     }
     if (typeof s.accountAgeDays === "number") {
       if (s.accountAgeDays < 30) {
         score += 0.4;
-        why.push("新注册账号(<30天)");
+        why.push("reasonNewAccount30");
       } else if (s.accountAgeDays < 90) {
         score += 0.25;
-        why.push("较新账号(<90天)");
+        why.push("reasonNewAccount90");
       } else if (s.accountAgeDays > 730 && !shapeMatch) {
         score -= 0.25;
-        why.push("老账号(>2年)");
+        why.push("reasonOldAccount");
       }
     }
     if (typeof s.followersCount === "number" && s.followersCount <= 5) {
       score += 0.2;
-      why.push("几乎无粉丝");
+      why.push("reasonNoFollowers");
     }
     if (PROMO_RE.test(blob)) {
       score += 0.35;
-      why.push("导流/性广告话术");
+      why.push("reasonPromoText");
     }
     if (LINK_RE.test(blob)) {
       score += 0.2;
-      why.push("外链/可疑域名");
+      why.push("reasonSuspiciousLink");
     }
     if (RANDOM_HANDLE_RE.test(s.handle)) {
       score += 0.15;
-      why.push("机器生成式 handle");
+      why.push("reasonRandomHandle");
     }
     return { score: Math.max(0, Math.min(1, score)), why };
   }
@@ -1485,16 +1784,16 @@
     const blocks = blockStats();
     const dangerous = findings.some((f) => ["spam", "porn_bot", "likely_spam"].includes(f.verdict.label));
     const title = !currentSettings.enabled
-      ? "已关闭"
+      ? t("off")
       : blocks.active + blocks.queued
-        ? `拉黑中 ${blocks.done}/${Math.max(1, findings.length)}`
+        ? t("blockingProgress", { done: blocks.done, total: Math.max(1, findings.length) })
         : findings.length
-          ? `命中 ${findings.length}`
+          ? t("hits", { count: findings.length })
           : activeScans
-            ? `扫描 ${activeScans}`
+            ? t("scanning", { count: activeScans })
             : scannedCount
-              ? `已扫 ${scannedCount}`
-              : "守护";
+              ? t("scanned", { count: scannedCount })
+              : t("guard");
     app.innerHTML = `
       <button class="pill ${dangerous ? "hit" : ""}" data-toggle>
         <span class="dot ${activeScans || blocks.active + blocks.queued ? "busy" : ""} ${dangerous ? "danger" : ""}"></span>
@@ -1524,15 +1823,15 @@
     const stats = blockStats();
     if (!findings.length) {
       return `
-        <div class="head"><b>${BRAND.acronym} 已启用</b><span class="spacer"></span><button class="iconbtn" data-settings>${iconText("gear")}</button></div>
+        <div class="head"><b>${escHtml(t("enabledTitle", { brand: BRAND.acronym }))}</b><span class="spacer"></span><button class="iconbtn" data-settings>${iconText("gear")}</button></div>
         <div class="stats">
-          <div class="metric"><b>${scannedCount}</b><span>已扫</span></div>
-          <div class="metric"><b>${activeScans}</b><span>分析</span></div>
-          <div class="metric"><b>${getMxgaStats().hitPublic}</b><span>公榜</span></div>
-          <div class="metric"><b>${getMxgaStats().blocked}</b><span>确认</span></div>
+          <div class="metric"><b>${scannedCount}</b><span>${escHtml(t("metricScanned"))}</span></div>
+          <div class="metric"><b>${activeScans}</b><span>${escHtml(t("metricAnalyzing"))}</span></div>
+          <div class="metric"><b>${getMxgaStats().hitPublic}</b><span>${escHtml(t("metricPublic"))}</span></div>
+          <div class="metric"><b>${getMxgaStats().blocked}</b><span>${escHtml(t("metricConfirmed"))}</span></div>
         </div>
-        <div class="empty">正在被动检查本页账号。发现可疑垃圾号时会显示在这里，并可一键拉黑。</div>
-        <div class="links"><span class="link" data-refresh>刷新白名单</span><span class="link" data-gov>治理规则</span></div>
+        <div class="empty">${escHtml(t("emptyPanel"))}</div>
+        <div class="links"><span class="link" data-refresh>${escHtml(t("refreshWhitelist"))}</span><span class="link" data-gov>${escHtml(t("governanceRules"))}</span></div>
       `;
     }
 
@@ -1543,55 +1842,55 @@
     ];
     const pendingSelectable = findings.filter((x) => !x.blocked && !x.blockQueued && !x.blockActive);
     return `
-      <div class="head"><b>本页命中 ${findings.length} 个账号</b><span class="spacer"></span><button class="iconbtn" data-settings>${iconText("gear")}</button><button class="iconbtn" data-close>${iconText("x")}</button></div>
+      <div class="head"><b>${escHtml(t("pageHitsTitle", { count: findings.length }))}</b><span class="spacer"></span><button class="iconbtn" data-settings>${iconText("gear")}</button><button class="iconbtn" data-close>${iconText("x")}</button></div>
       <div class="stats">
-        <div class="metric"><b>${findings.length}</b><span>命中</span></div>
-        <div class="metric"><b>${stats.active}</b><span>正在</span></div>
-        <div class="metric"><b>${stats.queued}</b><span>待拉</span></div>
-        <div class="metric"><b>${stats.done}</b><span>已拉</span></div>
+        <div class="metric"><b>${findings.length}</b><span>${escHtml(t("metricHits"))}</span></div>
+        <div class="metric"><b>${stats.active}</b><span>${escHtml(t("metricActive"))}</span></div>
+        <div class="metric"><b>${stats.queued}</b><span>${escHtml(t("metricQueued"))}</span></div>
+        <div class="metric"><b>${stats.done}</b><span>${escHtml(t("metricBlocked"))}</span></div>
       </div>
       <div>
         ${visible.map((f) => renderFindingRow(f)).join("")}
       </div>
-      <button class="main" data-block-all ${pendingSelectable.length ? "" : "disabled"}>一键拉黑未处理 ${pendingSelectable.length}</button>
-      <div class="links"><span class="link" data-first>跳到第一个</span><span class="link" data-clear>忽略本页</span><span class="link" data-gov>治理规则</span></div>
+      <button class="main" data-block-all ${pendingSelectable.length ? "" : "disabled"}>${escHtml(t("blockAllPending", { count: pendingSelectable.length }))}</button>
+      <div class="links"><span class="link" data-first>${escHtml(t("jumpFirst"))}</span><span class="link" data-clear>${escHtml(t("ignorePage"))}</span><span class="link" data-gov>${escHtml(t("governanceRules"))}</span></div>
     `;
   }
 
   function renderFindingRow(f) {
-    const meta = LABEL[f.verdict.label] || LABEL.uncertain;
+    const meta = labelMeta(f.verdict.label);
     const rowKeyValue = escHtml(f.userId || `h:${normalizeHandle(f.handle)}`);
     const avatar = f.avatarUrl ? `<img class="avatar" src="${escHtml(f.avatarUrl)}" alt="">` : `<span class="avatar"></span>`;
     const source = f.blockSource ? ` · ${sourceText(f.blockSource)}` : "";
     const note = f.blocked
-      ? `<div class="note" style="color:var(--mxga-green)">已拉黑${source}</div>`
+      ? `<div class="note" style="color:var(--mxga-green)">${escHtml(t("blockedWithSource", { source }))}</div>`
       : f.blockActive
-        ? `<div class="note" style="color:var(--mxga-red)">正在后台拉黑${source}</div>`
+        ? `<div class="note" style="color:var(--mxga-red)">${escHtml(t("blockingWithSource", { source }))}</div>`
         : f.blockQueued
-          ? `<div class="note" style="color:var(--mxga-blue)">待后台拉黑${source}</div>`
+          ? `<div class="note" style="color:var(--mxga-blue)">${escHtml(t("queuedWithSource", { source }))}</div>`
           : f.blockFailed
-            ? `<div class="note" style="color:var(--mxga-warn)">拉黑失败，可重试或手动处理</div>`
+            ? `<div class="note" style="color:var(--mxga-warn)">${escHtml(t("blockFailed"))}</div>`
             : "";
     return `
       <div class="row">
         ${avatar}
         <div class="body">
           <div class="name">${escHtml(f.displayName || `@${displayHandle(f.handle)}`)}</div>
-          <div class="meta" style="color:${meta.color}">@${escHtml(displayHandle(f.handle))} · ${meta.zh} · ${(f.verdict.confidence * 100).toFixed(0)}%</div>
+          <div class="meta" style="color:${meta.color}">@${escHtml(displayHandle(f.handle))} · ${escHtml(labelText(f.verdict.label))} · ${(f.verdict.confidence * 100).toFixed(0)}%</div>
           ${f.snippet ? `<div class="snip">${escHtml(String(f.snippet).replace(/\s+/g, " ").slice(0, 80))}</div>` : ""}
           ${note}
         </div>
-        <button class="small ${f.blocked ? "safe" : f.blockFailed ? "warn" : "danger"}" data-one="${rowKeyValue}" ${f.blocked || f.blockQueued || f.blockActive ? "disabled" : ""}>${f.blocked ? "已拉黑" : f.blockFailed ? "重试" : "拉黑"}</button>
+        <button class="small ${f.blocked ? "safe" : f.blockFailed ? "warn" : "danger"}" data-one="${rowKeyValue}" ${f.blocked || f.blockQueued || f.blockActive ? "disabled" : ""}>${escHtml(f.blocked ? t("blocked") : f.blockFailed ? t("retry") : t("block"))}</button>
       </div>
     `;
   }
 
   function sourceText(source) {
     return {
-      manual: "手动",
-      block_all: "批量",
-      list_hit: "公榜自动",
-      cache_hit: "缓存自动",
+      manual: t("sourceManual"),
+      block_all: t("sourceBatch"),
+      list_hit: t("sourcePublicAuto"),
+      cache_hit: t("sourceCacheAuto"),
     }[source] || source;
   }
 
@@ -1604,9 +1903,9 @@
     app.querySelector("[data-gov]")?.addEventListener("click", () => window.open(BRAND.governance, "_blank", "noopener"));
     app.querySelector("[data-refresh]")?.addEventListener("click", async () => {
       const el = app.querySelector("[data-refresh]");
-      if (el) el.textContent = "同步中";
+      if (el) el.textContent = t("syncing");
       await refreshWhitelist(true);
-      if (el) el.textContent = "已同步";
+      if (el) el.textContent = t("synced");
     });
     app.querySelector("[data-first]")?.addEventListener("click", () => {
       const first = findings[0];
@@ -1680,36 +1979,41 @@
     const login = getGhLogin();
     const local = getLocalStats();
     const mxga = getMxgaStats();
+    const language = s.language === "zh-CN" || s.language === "en" ? s.language : "auto";
     back.innerHTML = `
       <div class="modal">
-        <div class="head"><b>SFG 设置</b><span class="spacer"></span><button class="iconbtn" data-settings-close>${iconText("x")}</button></div>
-        ${toggleRow("enabled", "启用检测", "关闭后不扫描页面。", s.enabled)}
-        ${toggleRow("bubble", "显示右上角气泡", "隐藏后仍可从油猴菜单打开设置。", s.bubble)}
-        ${toggleRow("replyAuto", "回复区自动检查", "在回复页降低启发式阈值，覆盖更隐蔽的账号。", s.replyAuto)}
-        ${toggleRow("autoExpandOnFinding", "命中后自动展开", "发现可疑账号时自动弹出处理面板。", s.autoExpandOnFinding)}
-        ${toggleRow("autoBlockListHits", "自动拉黑公榜/缓存命中", "危险选项：命中公榜或本机历史垃圾缓存时静默加入拉黑队列。", s.autoBlockListHits)}
+        <div class="head"><b>${escHtml(t("settingsTitle", { brand: BRAND.acronym }))}</b><span class="spacer"></span><button class="iconbtn" data-settings-close>${iconText("x")}</button></div>
         <div class="formrow">
-          <div><label>气泡位置</label><div class="hint">右上或右下。</div></div>
-          <div class="seg"><button data-pos="tr" class="${s.bubblePos === "tr" ? "on" : ""}">右上</button><button data-pos="br" class="${s.bubblePos === "br" ? "on" : ""}">右下</button></div>
+          <div><label>${escHtml(t("language"))}</label><div class="hint">${escHtml(t("languageHint"))}</div></div>
+          <div class="seg"><button data-lang="auto" class="${language === "auto" ? "on" : ""}">${escHtml(t("auto"))}</button><button data-lang="zh-CN" class="${language === "zh-CN" ? "on" : ""}">${escHtml(t("simplifiedChinese"))}</button><button data-lang="en" class="${language === "en" ? "on" : ""}">${escHtml(t("english"))}</button></div>
+        </div>
+        ${toggleRow("enabled", t("enabledDetection"), t("enabledDetectionHint"), s.enabled)}
+        ${toggleRow("bubble", t("bubbleVisible"), t("bubbleVisibleHint"), s.bubble)}
+        ${toggleRow("replyAuto", t("replyAuto"), t("replyAutoHint"), s.replyAuto)}
+        ${toggleRow("autoExpandOnFinding", t("autoExpand"), t("autoExpandHint"), s.autoExpandOnFinding)}
+        ${toggleRow("autoBlockListHits", t("autoBlockHits"), t("autoBlockHitsHint"), s.autoBlockListHits)}
+        <div class="formrow">
+          <div><label>${escHtml(t("bubblePosition"))}</label><div class="hint">${escHtml(t("bubblePositionHint"))}</div></div>
+          <div class="seg"><button data-pos="tr" class="${s.bubblePos === "tr" ? "on" : ""}">${escHtml(t("topRight"))}</button><button data-pos="br" class="${s.bubblePos === "br" ? "on" : ""}">${escHtml(t("bottomRight"))}</button></div>
         </div>
         <div class="formrow" style="grid-template-columns:1fr">
-          <div><label>Edge API 地址</label><div class="hint">留空使用 ${escHtml(BRAND.edgeBase)}</div></div>
+          <div><label>${escHtml(t("edgeApi"))}</label><div class="hint">${escHtml(t("edgeApiHint", { url: BRAND.edgeBase }))}</div></div>
           <input class="textinput" data-edge-base value="${escHtml(s.edgeBase)}" placeholder="${escHtml(BRAND.edgeBase)}">
         </div>
         <div class="formrow">
-          <div><label>GitHub 登录</label><div class="hint">${login ? `当前：${escHtml(login)}` : "登录后可上报和确认垃圾账号。"}</div></div>
-          <button class="small ${login ? "secondary" : ""}" data-gh>${login ? "退出" : "登录"}</button>
+          <div><label>${escHtml(t("githubLogin"))}</label><div class="hint">${login ? escHtml(t("githubCurrent", { login })) : escHtml(t("githubLoginHint"))}</div></div>
+          <button class="small ${login ? "secondary" : ""}" data-gh>${escHtml(login ? t("logout") : t("login"))}</button>
         </div>
         <div class="formrow">
-          <div><label>白名单缓存</label><div class="hint">${ws.count} 条，${ws.lastSyncedAt ? new Date(ws.lastSyncedAt).toLocaleString() : "尚未同步"}</div></div>
-          <button class="small secondary" data-whitelist>刷新</button>
+          <div><label>${escHtml(t("whitelistCache"))}</label><div class="hint">${escHtml(t("whitelistStatus", { count: ws.count, time: formatDateTime(ws.lastSyncedAt) }))}</div></div>
+          <button class="small secondary" data-whitelist>${escHtml(t("refreshWhitelist"))}</button>
         </div>
         <div class="formrow">
-          <div><label>本地统计</label><div class="hint">AI ${mxga.scanned} · 公榜 ${mxga.hitPublic} · 确认 ${mxga.blocked} · 拉黑 ${local.blocks}</div></div>
-          <button class="small danger" data-clear-local>清空</button>
+          <div><label>${escHtml(t("localStats"))}</label><div class="hint">${escHtml(t("localStatsLine", { ai: mxga.scanned, public: mxga.hitPublic, confirmed: mxga.blocked, blocks: local.blocks }))}</div></div>
+          <button class="small danger" data-clear-local>${escHtml(t("clear"))}</button>
         </div>
-        <div class="links"><span class="link" data-open-repo>GitHub</span><span class="link" data-open-privacy>隐私说明</span></div>
-        <div class="hint" style="margin-top:12px">Safari 油猴版是单文件脚本；目标页面结构变动时可能需要更新。</div>
+        <div class="links"><span class="link" data-open-repo>GitHub</span><span class="link" data-open-privacy>${escHtml(t("privacy"))}</span></div>
+        <div class="hint" style="margin-top:12px">${escHtml(t("safariNote"))}</div>
       </div>
     `;
     bindSettings(back);
@@ -1735,6 +2039,9 @@
     root.querySelectorAll("[data-pos]").forEach((btn) => {
       btn.addEventListener("click", () => setSetting("bubblePos", btn.getAttribute("data-pos")));
     });
+    root.querySelectorAll("[data-lang]").forEach((btn) => {
+      btn.addEventListener("click", () => setSetting("language", btn.getAttribute("data-lang")));
+    });
     const input = root.querySelector("[data-edge-base]");
     input?.addEventListener("change", () => setSetting("edgeBase", input.value.trim().replace(/\/+$/, "")));
     root.querySelector("[data-gh]")?.addEventListener("click", async () => {
@@ -1746,12 +2053,12 @@
       }
     });
     root.querySelector("[data-whitelist]")?.addEventListener("click", async (ev) => {
-      ev.currentTarget.textContent = "刷新中";
+      ev.currentTarget.textContent = t("refreshing");
       await refreshWhitelist(true);
       renderSettingsIfOpen();
     });
     root.querySelector("[data-clear-local]")?.addEventListener("click", () => {
-      if (!confirm("清空 SFG 的本地缓存、队列、登录态和统计？")) return;
+      if (!confirm(t("clearConfirm"))) return;
       gmClearAll();
       warmBlocklist();
       loadWhitelistOnce();
@@ -1767,16 +2074,16 @@
   async function startGithubLogin(modal) {
     const start = await send({ type: "gh_start" });
     if (!start.ok) {
-      alert(`GitHub 登录启动失败：${start.error || "unknown"}`);
+      alert(t("githubLoginStartFailed", { error: start.error || "unknown" }));
       return;
     }
     const data = start.data;
     modal.insertAdjacentHTML(
       "afterbegin",
       `<div class="formrow" style="grid-template-columns:1fr;margin-bottom:8px">
-        <div><label>GitHub Device Flow</label><div class="hint">打开 GitHub 输入验证码：<span class="code">${escHtml(data.user_code)}</span></div></div>
-        <button class="small" data-open-gh>打开验证页</button>
-        <div class="hint" data-gh-status>等待授权...</div>
+        <div><label>${escHtml(t("githubDeviceFlow"))}</label><div class="hint">${escHtml(t("githubDeviceHint", { code: "" }))}<span class="code">${escHtml(data.user_code)}</span></div></div>
+        <button class="small" data-open-gh>${escHtml(t("openVerification"))}</button>
+        <div class="hint" data-gh-status>${escHtml(t("waitingAuth"))}</div>
       </div>`,
     );
     modal.querySelector("[data-open-gh]")?.addEventListener("click", () => window.open(data.verification_uri, "_blank", "noopener"));
@@ -1788,10 +2095,10 @@
       if (res.ok && res.data?.login) {
         clearInterval(settingsPollTimer);
         settingsPollTimer = null;
-        if (status) status.textContent = `已登录：${res.data.login}`;
+        if (status) status.textContent = t("loggedInAs", { login: res.data.login });
         setTimeout(renderSettingsIfOpen, 700);
       } else if (status) {
-        status.textContent = `等待授权... ${res.data?.pending || res.error || ""}`;
+        status.textContent = t("waitingAuthDetail", { detail: res.data?.pending || res.error || "" });
       }
     }, Math.max(5, data.interval || 5) * 1000);
   }
@@ -1844,7 +2151,7 @@
     st.textContent = STYLE;
     const el = document.createElement("span");
     el.className = `xss-badge ${kind === "blocking" ? "blocking" : kind === "analyzing" ? "clean" : ""}`;
-    el.textContent = kind === "blocking" ? "屏蔽中" : kind === "analyzing" ? "分析" : "排队";
+    el.textContent = kind === "blocking" ? t("statusBlocking") : kind === "analyzing" ? t("statusAnalyzing") : t("statusQueued");
     sr.append(st, el);
     anchor.appendChild(host);
   }
@@ -1858,20 +2165,20 @@
     const el = document.createElement("span");
     if (source === "whitelist") {
       el.className = "xss-badge safe";
-      el.textContent = "白名单";
+      el.textContent = t("whitelist");
       return el;
     }
     if (!v) {
       el.className = "xss-badge clean";
-      el.textContent = actions.canReport ? "处理" : "检查";
+      el.textContent = actions.canReport ? t("handle") : t("check");
       el.addEventListener("click", (ev) => showManualPopover(ev, el, actions));
       return el;
     }
-    const meta = LABEL[v.label] || LABEL.uncertain;
+    const meta = labelMeta(v.label);
     const spammy = ["spam", "porn_bot", "likely_spam"].includes(v.label);
     el.className = `xss-badge ${spammy ? "danger" : v.label === "legit" ? "safe" : "warn"}`;
-    el.textContent = source === "list" ? "公榜" : source === "cache" ? `缓存 ${meta.short}` : meta.short;
-    el.title = `${meta.zh} ${(v.confidence * 100).toFixed(0)}%`;
+    el.textContent = source === "list" ? t("badgePublic") : source === "cache" ? `${t("badgeCache")} ${labelShort(v.label)}` : labelShort(v.label);
+    el.title = `${labelText(v.label)} ${(v.confidence * 100).toFixed(0)}%`;
     el.addEventListener("click", (ev) => showVerdictPopover(ev, el, v, actions, note, source));
     el.addEventListener("mouseenter", (ev) => showVerdictPopover(ev, el, v, actions, note, source, true));
     return el;
@@ -1910,12 +2217,12 @@
     pop.className = "pop";
     pop.style.pointerEvents = "auto";
     pop.innerHTML = `
-      <h4>手动处理</h4>
-      <div class="hint">未命中时可主动检查、上报或拉黑并上报。</div>
+      <h4>${escHtml(t("manualTitle"))}</h4>
+      <div class="hint">${escHtml(t("manualHint"))}</div>
       <div class="acts">
-        <button class="small secondary" data-check>检查</button>
-        ${actions.canReport ? '<button class="small warn" data-report>上报</button>' : ""}
-        <button class="small" data-block>拉黑并上报</button>
+        <button class="small secondary" data-check>${escHtml(t("check"))}</button>
+        ${actions.canReport ? `<button class="small warn" data-report>${escHtml(t("report"))}</button>` : ""}
+        <button class="small" data-block>${escHtml(t("blockAndReport"))}</button>
       </div>`;
     root.appendChild(pop);
     placePop(pop, anchor, ev);
@@ -1924,12 +2231,12 @@
       clearPopovers();
     });
     pop.querySelector("[data-report]")?.addEventListener("click", async (e) => {
-      e.currentTarget.textContent = "上报中";
+      e.currentTarget.textContent = t("reporting");
       try {
         await actions.onReport();
-        e.currentTarget.textContent = "已上报";
+        e.currentTarget.textContent = t("reported");
       } catch (err) {
-        e.currentTarget.textContent = "失败";
+        e.currentTarget.textContent = t("failed");
         e.currentTarget.title = err.message || String(err);
       }
     });
@@ -1943,20 +2250,20 @@
   function showVerdictPopover(ev, anchor, v, actions, note, source, hover = false) {
     clearPopovers();
     const root = createPopoverHost();
-    const meta = LABEL[v.label] || LABEL.uncertain;
+    const meta = labelMeta(v.label);
     const spammy = ["spam", "porn_bot", "likely_spam"].includes(v.label);
     const pop = document.createElement("div");
     pop.className = "pop";
     pop.style.pointerEvents = "auto";
-    const sourceLabel = source === "list" ? "公榜确认" : source === "cache" ? "本地缓存" : "AI 现场判定";
+    const sourceLabel = source === "list" ? t("sourcePublicConfirmed") : source === "cache" ? t("sourceLocalCache") : t("sourceAiLive");
     pop.innerHTML = `
-      <h4 style="color:${meta.color}">${escHtml(sourceLabel)} · ${meta.zh} ${(v.confidence * 100).toFixed(0)}%</h4>
-      <ul>${(v.reasons || []).map((r) => `<li>${escHtml(r)}</li>`).join("") || "<li>无详细理由</li>"}</ul>
+      <h4 style="color:${meta.color}">${escHtml(sourceLabel)} · ${escHtml(labelText(v.label))} ${(v.confidence * 100).toFixed(0)}%</h4>
+      <ul>${(v.reasons || []).map((r) => `<li>${escHtml(reasonText(r))}</li>`).join("") || `<li>${escHtml(t("noDetailedReason"))}</li>`}</ul>
       ${note ? `<div class="hint">${escHtml(note)}</div>` : ""}
       <div class="acts">
-        ${spammy ? '<button class="small" data-block>拉黑</button><button class="small secondary" data-hide>隐藏</button>' : ""}
-        ${actions.canReport ? '<button class="small warn" data-report>上报</button>' : ""}
-        <button class="small secondary" data-appeal>误判?</button>
+        ${spammy ? `<button class="small" data-block>${escHtml(t("block"))}</button><button class="small secondary" data-hide>${escHtml(t("hide"))}</button>` : ""}
+        ${actions.canReport ? `<button class="small warn" data-report>${escHtml(t("report"))}</button>` : ""}
+        <button class="small secondary" data-appeal>${escHtml(t("appeal"))}</button>
       </div>`;
     root.appendChild(pop);
     placePop(pop, anchor, ev);
@@ -1969,12 +2276,12 @@
       clearPopovers();
     });
     pop.querySelector("[data-report]")?.addEventListener("click", async (e) => {
-      e.currentTarget.textContent = "上报中";
+      e.currentTarget.textContent = t("reporting");
       try {
         await actions.onReport();
-        e.currentTarget.textContent = "已上报";
+        e.currentTarget.textContent = t("reported");
       } catch (err) {
-        e.currentTarget.textContent = "失败";
+        e.currentTarget.textContent = t("failed");
         e.currentTarget.title = err.message || String(err);
       }
     });
@@ -1994,7 +2301,7 @@
     setTimeout(schedule, 2500);
   }
 
-  let currentSettings = getSettings();
+  currentSettings = getSettings();
   let canReport = false;
   const inflight = new Map();
   const anchorByKey = new Map();
@@ -2130,7 +2437,7 @@
 
   async function reportAccount(sig) {
     const resp = await send({ type: "report_spam", signals: stripIsProfile(sig) });
-    if (!resp.ok) throw new Error(resp.error || "上报失败");
+    if (!resp.ok) throw new Error(resp.error || t("reportFailed"));
   }
 
   function stripIsProfile(sig) {
@@ -2180,11 +2487,11 @@
     const p = (async () => {
       const resp = await send({ type: "classify", signals: stripIsProfile(sig) });
       if (!resp.ok || !resp.data) {
-        badgeFor(anchor, key, sig, null, resp.error || "分类失败");
+        badgeFor(anchor, key, sig, null, resp.error || t("classifyFailed"));
         return;
       }
       const { record, idResolved } = resp.data;
-      badgeFor(anchor, key, sig, record.verdict, idResolved ? undefined : "数字ID未解析，handle 兜底", "fresh");
+      badgeFor(anchor, key, sig, record.verdict, idResolved ? undefined : t("idFallback"), "fresh");
       pushFinding(sig, record.verdict);
       bumpStats({ detections: 1, label: record.verdict.label });
       cacheSet(key, {
@@ -2503,9 +2810,9 @@
   }
 
   if (typeof GM_registerMenuCommand === "function") {
-    GM_registerMenuCommand("SFG 设置", openSettings);
-    GM_registerMenuCommand("SFG 切换启用/关闭", () => setSetting("enabled", !getSettings().enabled));
-    GM_registerMenuCommand("SFG 刷新白名单", () => void refreshWhitelist(true));
+    GM_registerMenuCommand(t("menuSettings"), openSettings);
+    GM_registerMenuCommand(t("menuToggle"), () => setSetting("enabled", !getSettings().enabled));
+    GM_registerMenuCommand(t("menuRefreshWhitelist"), () => void refreshWhitelist(true));
   }
 
   bootWhenReady();

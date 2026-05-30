@@ -16,6 +16,10 @@ The userscript includes its own Tampermonkey update metadata.
 
 After editing the script, bump the `@version` value near the top of the file. Tampermonkey can then pick up the new version through its normal update check.
 
+## Language
+
+The UI supports Simplified Chinese and English. By default it follows the browser language, and it can be changed in the SFG settings panel.
+
 ## Files
 
 - `safari-feed-guard.user.js` - the installable userscript
