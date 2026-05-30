@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         Feed Guard
-// @namespace    https://github.com/char1eslu/make-x-great-again
+// @namespace    https://github.com/char1eslu/safari-feed-guard
 // @version      0.4.0-safari.5
 // @description  Safari/Tampermonkey userscript with inline labels, local cache, remote checks, and a paced action queue.
 // @author       char1eslu
 // @license      AGPL-3.0-only
-// @homepageURL  https://github.com/char1eslu/make-x-great-again
-// @supportURL   https://github.com/char1eslu/make-x-great-again/issues
-// @downloadURL  https://raw.githubusercontent.com/char1eslu/make-x-great-again/main/mxga-safari.user.js
-// @updateURL    https://raw.githubusercontent.com/char1eslu/make-x-great-again/main/mxga-safari.user.js
+// @homepageURL  https://github.com/char1eslu/safari-feed-guard
+// @supportURL   https://github.com/char1eslu/safari-feed-guard/issues
+// @downloadURL  https://raw.githubusercontent.com/char1eslu/safari-feed-guard/main/feed-guard.user.js
+// @updateURL    https://raw.githubusercontent.com/char1eslu/safari-feed-guard/main/feed-guard.user.js
 // @match        https://x.com/*
 // @match        https://twitter.com/*
 // @run-at       document-start
@@ -37,10 +37,10 @@
     name: "Feed Guard",
     acronym: "SFG",
     edgeBase: "https://x.zuoluo.tv",
-    repo: "https://github.com/foru17/make-x-great-again",
-    governance: "https://github.com/foru17/make-x-great-again/blob/main/docs/GOVERNANCE.md",
-    privacy: "https://github.com/foru17/make-x-great-again/blob/main/docs/PRIVACY.md",
-    appealNewIssue: "https://github.com/foru17/make-x-great-again/issues/new?template=appeal.yml",
+    repo: "https://github.com/char1eslu/safari-feed-guard",
+    governance: "https://github.com/char1eslu/safari-feed-guard",
+    privacy: "https://github.com/char1eslu/safari-feed-guard",
+    appealNewIssue: "https://github.com/char1eslu/safari-feed-guard/issues/new",
   };
 
   const GH_CLIENT_ID = "Ov23liP2AbdNePTyKUEA";

@@ -6,7 +6,7 @@ This repository publishes a single Safari/Tampermonkey userscript.
 
 Open this link in Safari with Tampermonkey enabled:
 
-**[Install / update userscript](https://raw.githubusercontent.com/char1eslu/make-x-great-again/main/mxga-safari.user.js)**
+**[Install / update userscript](https://raw.githubusercontent.com/char1eslu/safari-feed-guard/main/feed-guard.user.js)**
 
 Tampermonkey should detect the `.user.js` file and show an install or update page.
 
@@ -18,5 +18,5 @@ After editing the script, bump the `@version` value near the top of the file. Ta
 
 ## Files
 
-- `mxga-safari.user.js` - the installable userscript
+- `feed-guard.user.js` - the installable userscript
 - `LICENSE` - license notice
