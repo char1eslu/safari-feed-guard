@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Make X Great Again Safari
-// @namespace    https://github.com/foru17/make-x-great-again
-// @version      0.4.0-safari.3
-// @description  MXGA full userscript port for Safari Tampermonkey: X spam detection, public list lookup, AI classify, GitHub reporting, whitelist cache, and real X block queue.
-// @author       foru17, ported for Safari userscript by Codex
+// @name         Safari Feed Guard
+// @namespace    https://github.com/char1eslu/make-x-great-again
+// @version      0.4.0-safari.4
+// @description  Safari/Tampermonkey userscript with inline labels, local cache, remote checks, and a paced action queue.
+// @author       char1eslu
 // @license      AGPL-3.0-only
 // @homepageURL  https://github.com/char1eslu/make-x-great-again
 // @supportURL   https://github.com/char1eslu/make-x-great-again/issues
@@ -27,17 +27,15 @@
 // ==/UserScript==
 
 /*
- * Derived from foru17/make-x-great-again, AGPL-3.0-only.
- * This Safari userscript keeps the extension's full consumer feature surface
- * without relying on Chrome MV3 APIs.
+ * AGPL-3.0-only userscript distribution.
  */
 
-(function mxgaSafariUserscript() {
+(function feedGuardUserscript() {
   "use strict";
 
   const BRAND = {
-    name: "Make X Great Again",
-    acronym: "MXGA",
+    name: "Safari Feed Guard",
+    acronym: "SFG",
     edgeBase: "https://x.zuoluo.tv",
     repo: "https://github.com/foru17/make-x-great-again",
     governance: "https://github.com/foru17/make-x-great-again/blob/main/docs/GOVERNANCE.md",
@@ -51,7 +49,7 @@
   const BLOCK_KEY = "xss:blocked";
   const BLOCK_RECORD_KEY = "xss:blocklist:v2";
   const STATS_KEY = "xss:stats";
-  const MXGA_STATS_KEY = "mxga_stats_v1";
+  const LOCAL_USAGE_STATS_KEY = "mxga_stats_v1";
   const CACHE_PREFIX = "xss:v1:";
   const WHITELIST_KEY = "mxga_whitelist_v1";
   const QUEUE_KEY = "xss:blockQueue";
@@ -430,7 +428,7 @@
   }
 
   function getMxgaStats() {
-    const s = gmGet(MXGA_STATS_KEY, {}) || {};
+    const s = gmGet(LOCAL_USAGE_STATS_KEY, {}) || {};
     return {
       scanned: s.scanned || 0,
       hitPublic: s.hitPublic || 0,
@@ -447,7 +445,7 @@
     const cur = getMxgaStats();
     cur[key] = (cur[key] || 0) + Math.max(0, Math.floor(n));
     if (!cur.firstUsedAt) cur.firstUsedAt = Date.now();
-    gmSet(MXGA_STATS_KEY, cur);
+    gmSet(LOCAL_USAGE_STATS_KEY, cur);
   }
 
   function getLocalStats() {
@@ -779,7 +777,7 @@
         };
       }
     } catch (e) {
-      console.warn("[MXGA] GraphQL hook failed", e);
+      console.warn("[SFG] GraphQL hook failed", e);
     }
   }
 
@@ -1684,10 +1682,10 @@
     const mxga = getMxgaStats();
     back.innerHTML = `
       <div class="modal">
-        <div class="head"><b>MXGA 设置</b><span class="spacer"></span><button class="iconbtn" data-settings-close>${iconText("x")}</button></div>
+        <div class="head"><b>SFG 设置</b><span class="spacer"></span><button class="iconbtn" data-settings-close>${iconText("x")}</button></div>
         ${toggleRow("enabled", "启用检测", "关闭后不扫描页面。", s.enabled)}
         ${toggleRow("bubble", "显示右上角气泡", "隐藏后仍可从油猴菜单打开设置。", s.bubble)}
-        ${toggleRow("replyAuto", "回复区自动检查", "在推文回复页降低启发式阈值，覆盖更隐蔽的 bot。", s.replyAuto)}
+        ${toggleRow("replyAuto", "回复区自动检查", "在回复页降低启发式阈值，覆盖更隐蔽的账号。", s.replyAuto)}
         ${toggleRow("autoExpandOnFinding", "命中后自动展开", "发现可疑账号时自动弹出处理面板。", s.autoExpandOnFinding)}
         ${toggleRow("autoBlockListHits", "自动拉黑公榜/缓存命中", "危险选项：命中公榜或本机历史垃圾缓存时静默加入拉黑队列。", s.autoBlockListHits)}
         <div class="formrow">
@@ -1711,7 +1709,7 @@
           <button class="small danger" data-clear-local>清空</button>
         </div>
         <div class="links"><span class="link" data-open-repo>GitHub</span><span class="link" data-open-privacy>隐私说明</span></div>
-        <div class="hint" style="margin-top:12px">Safari 油猴版是单文件移植；X 页面结构变动时可能需要更新脚本。</div>
+        <div class="hint" style="margin-top:12px">Safari 油猴版是单文件脚本；目标页面结构变动时可能需要更新。</div>
       </div>
     `;
     bindSettings(back);
@@ -1753,7 +1751,7 @@
       renderSettingsIfOpen();
     });
     root.querySelector("[data-clear-local]")?.addEventListener("click", () => {
-      if (!confirm("清空 MXGA 油猴版的本地缓存、队列、登录态和统计？")) return;
+      if (!confirm("清空 SFG 的本地缓存、队列、登录态和统计？")) return;
       gmClearAll();
       warmBlocklist();
       loadWhitelistOnce();
@@ -2505,9 +2503,9 @@
   }
 
   if (typeof GM_registerMenuCommand === "function") {
-    GM_registerMenuCommand("MXGA 设置", openSettings);
-    GM_registerMenuCommand("MXGA 切换启用/关闭", () => setSetting("enabled", !getSettings().enabled));
-    GM_registerMenuCommand("MXGA 刷新白名单", () => void refreshWhitelist(true));
+    GM_registerMenuCommand("SFG 设置", openSettings);
+    GM_registerMenuCommand("SFG 切换启用/关闭", () => setSetting("enabled", !getSettings().enabled));
+    GM_registerMenuCommand("SFG 刷新白名单", () => void refreshWhitelist(true));
   }
 
   bootWhenReady();
