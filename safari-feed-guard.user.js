@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Safari Feed Guard
 // @namespace    https://github.com/char1eslu/safari-feed-guard
-// @version      0.4.0-safari.7
+// @version      0.4.0-safari.8
 // @description  Safari/Tampermonkey userscript with bilingual UI, inline labels, local cache, remote checks, and a paced action queue.
 // @author       char1eslu
 // @license      AGPL-3.0-only
@@ -157,6 +157,7 @@
       safariNote: "Safari 油猴版是单文件脚本；目标页面结构变动时可能需要更新。",
       refreshing: "刷新中",
       clearConfirm: "清空 SFG 的本地缓存、队列、登录态和统计？",
+      blockAllConfirm: "确定批量拉黑 {count} 个账号？\n\n短时间连续拉黑大量账号可能触发 X 风控（Ghost Ban、功能限制甚至冻结）。建议分批、少量处理，避免高频批量操作。",
       githubLoginStartFailed: "GitHub 登录启动失败：{error}",
       githubDeviceFlow: "GitHub Device Flow",
       githubDeviceHint: "打开 GitHub 输入验证码：{code}",
@@ -274,6 +275,7 @@
       safariNote: "The Safari userscript is a single-file port; page structure changes may require an update.",
       refreshing: "Refreshing",
       clearConfirm: "Clear SFG local cache, queue, login state, and stats?",
+      blockAllConfirm: "Block {count} accounts in bulk?\n\nBlocking many accounts in a short time may trip X's anti-automation defenses (ghost ban, feature limits, even suspension). Prefer small batches and avoid high-frequency bulk actions.",
       githubLoginStartFailed: "GitHub login failed to start: {error}",
       githubDeviceFlow: "GitHub Device Flow",
       githubDeviceHint: "Open GitHub and enter this code: {code}",
@@ -1734,6 +1736,24 @@
     .acts { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
   `;
 
+  function attachStyledShadow(host) {
+    const root = host.attachShadow({ mode: "open" });
+    const st = document.createElement("style");
+    st.textContent = STYLE;
+    root.appendChild(st);
+    return root;
+  }
+
+  function createBadgeMountHost(className) {
+    const host = document.createElement("span");
+    host.className = className;
+    host.style.display = "inline-flex";
+    host.style.alignItems = "center";
+    host.style.verticalAlign = "middle";
+    host.style.flex = "0 0 auto";
+    return { host, root: attachStyledShadow(host) };
+  }
+
   let bubbleRoot = null;
   let bubbleShadow = null;
   let bubbleOpen = false;
@@ -1754,10 +1774,7 @@
     host.style.zIndex = "2147483000";
     host.style.inset = "0";
     host.style.pointerEvents = "none";
-    const shadow = host.attachShadow({ mode: "open" });
-    const st = document.createElement("style");
-    st.textContent = STYLE;
-    shadow.appendChild(st);
+    const shadow = attachStyledShadow(host);
     const app = document.createElement("div");
     app.className = `mxga-bubble ${getSettings().bubblePos === "br" ? "br" : ""}`;
     app.style.pointerEvents = "auto";
@@ -1859,7 +1876,7 @@
 
   function renderFindingRow(f) {
     const meta = labelMeta(f.verdict.label);
-    const rowKeyValue = escHtml(f.userId || `h:${normalizeHandle(f.handle)}`);
+    const rowKeyValue = escHtml(keyOf(f));
     const avatar = f.avatarUrl ? `<img class="avatar" src="${escHtml(f.avatarUrl)}" alt="">` : `<span class="avatar"></span>`;
     const source = f.blockSource ? ` · ${sourceText(f.blockSource)}` : "";
     const note = f.blocked
@@ -1910,7 +1927,7 @@
     app.querySelector("[data-first]")?.addEventListener("click", () => {
       const first = findings[0];
       if (!first) return;
-      anchorByKey.get(first.userId || `h:${normalizeHandle(first.handle)}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      anchorByKey.get(keyOf(first))?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
     app.querySelector("[data-clear]")?.addEventListener("click", () => {
       findings.length = 0;
@@ -1918,9 +1935,11 @@
     });
     app.querySelector("[data-block-all]")?.addEventListener("click", () => {
       const targets = findings.filter((x) => !x.blocked && !x.blockQueued && !x.blockActive);
+      if (!targets.length) return;
+      if (!confirm(t("blockAllConfirm", { count: targets.length }))) return;
       enqueueBlocks(
         targets.map((f) => ({
-          key: f.userId || `h:${normalizeHandle(f.handle)}`,
+          key: keyOf(f),
           sig: signalFromFinding(f),
           verdict: f.verdict,
         })),
@@ -1930,8 +1949,8 @@
     app.querySelectorAll("[data-one]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-one");
-        const f = findings.find((x) => (x.userId || `h:${normalizeHandle(x.handle)}`) === id);
-        if (f) void blockAccount(f.userId || `h:${normalizeHandle(f.handle)}`, signalFromFinding(f));
+        const f = findings.find((x) => keyOf(x) === id);
+        if (f) void blockAccount(keyOf(f), signalFromFinding(f));
       });
     });
   }
@@ -2111,25 +2130,14 @@
     host.style.inset = "0";
     host.style.zIndex = "2147483002";
     host.style.pointerEvents = "none";
-    const root = host.attachShadow({ mode: "open" });
-    const st = document.createElement("style");
-    st.textContent = STYLE;
-    root.appendChild(st);
+    const root = attachStyledShadow(host);
     (document.documentElement || document.body).appendChild(host);
     return root;
   }
 
   function mountBadge(anchor, build) {
-    const host = document.createElement("span");
-    host.className = "xss-mount";
-    host.style.display = "inline-flex";
-    host.style.alignItems = "center";
-    host.style.verticalAlign = "middle";
-    host.style.flex = "0 0 auto";
-    const sr = host.attachShadow({ mode: "open" });
-    const st = document.createElement("style");
-    st.textContent = STYLE;
-    sr.append(st, build());
+    const { host, root } = createBadgeMountHost("xss-mount");
+    root.append(build());
     anchor.appendChild(host);
   }
 
@@ -2137,22 +2145,18 @@
     anchor.querySelectorAll(":scope > .xss-mount, :scope > .xss-pending").forEach((n) => n.remove());
   }
 
-  function mountStatus(anchor, kind) {
+  function mountStatus(anchor, kind, actions) {
     const cls = kind === "pending" ? "xss-pending" : "xss-mount";
     if (anchor.querySelector(`:scope > .${cls}`)) return;
-    const host = document.createElement("span");
-    host.className = cls;
-    host.style.display = "inline-flex";
-    host.style.alignItems = "center";
-    host.style.verticalAlign = "middle";
-    host.style.flex = "0 0 auto";
-    const sr = host.attachShadow({ mode: "open" });
-    const st = document.createElement("style");
-    st.textContent = STYLE;
+    const { host, root } = createBadgeMountHost(cls);
     const el = document.createElement("span");
     el.className = `xss-badge ${kind === "blocking" ? "blocking" : kind === "analyzing" ? "clean" : ""}`;
     el.textContent = kind === "blocking" ? t("statusBlocking") : kind === "analyzing" ? t("statusAnalyzing") : t("statusQueued");
-    sr.append(st, el);
+    if (kind === "analyzing" && actions) {
+      el.style.cursor = "pointer";
+      el.addEventListener("click", (ev) => showManualPopover(ev, el, actions));
+    }
+    root.append(el);
     anchor.appendChild(host);
   }
 
@@ -2180,7 +2184,10 @@
     el.textContent = source === "list" ? t("badgePublic") : source === "cache" ? `${t("badgeCache")} ${labelShort(v.label)}` : labelShort(v.label);
     el.title = `${labelText(v.label)} ${(v.confidence * 100).toFixed(0)}%`;
     el.addEventListener("click", (ev) => showVerdictPopover(ev, el, v, actions, note, source));
-    el.addEventListener("mouseenter", (ev) => showVerdictPopover(ev, el, v, actions, note, source, true));
+    el.addEventListener("pointerenter", (ev) => {
+      if (ev.pointerType === "touch") return; // touch devices: tap-only, no hover preview
+      showVerdictPopover(ev, el, v, actions, note, source, true);
+    });
     return el;
   }
 
@@ -2210,6 +2217,21 @@
     createPopoverHost().querySelectorAll(".pop").forEach((p) => p.remove());
   }
 
+  function bindReportButton(btn, onReport) {
+    if (!btn) return;
+    btn.addEventListener("click", async (e) => {
+      const target = e.currentTarget;
+      target.textContent = t("reporting");
+      try {
+        await onReport();
+        target.textContent = t("reported");
+      } catch (err) {
+        target.textContent = t("failed");
+        target.title = err.message || String(err);
+      }
+    });
+  }
+
   function showManualPopover(ev, anchor, actions) {
     clearPopovers();
     const root = createPopoverHost();
@@ -2230,16 +2252,7 @@
       actions.onCheck?.();
       clearPopovers();
     });
-    pop.querySelector("[data-report]")?.addEventListener("click", async (e) => {
-      e.currentTarget.textContent = t("reporting");
-      try {
-        await actions.onReport();
-        e.currentTarget.textContent = t("reported");
-      } catch (err) {
-        e.currentTarget.textContent = t("failed");
-        e.currentTarget.title = err.message || String(err);
-      }
-    });
+    bindReportButton(pop.querySelector("[data-report]"), () => actions.onReport());
     pop.querySelector("[data-block]")?.addEventListener("click", () => {
       actions.onBlock();
       clearPopovers();
@@ -2275,16 +2288,7 @@
       actions.onHide();
       clearPopovers();
     });
-    pop.querySelector("[data-report]")?.addEventListener("click", async (e) => {
-      e.currentTarget.textContent = t("reporting");
-      try {
-        await actions.onReport();
-        e.currentTarget.textContent = t("reported");
-      } catch (err) {
-        e.currentTarget.textContent = t("failed");
-        e.currentTarget.title = err.message || String(err);
-      }
-    });
+    bindReportButton(pop.querySelector("[data-report]"), () => actions.onReport());
     pop.querySelector("[data-appeal]")?.addEventListener("click", () => window.open(BRAND.appealNewIssue, "_blank", "noopener"));
     if (hover) schedulePopoverDismiss(pop);
   }
@@ -2435,7 +2439,16 @@
     return finding;
   }
 
-  async function reportAccount(sig) {
+  function cancelClassify(key) {
+    const running = inflight.get(key);
+    // 单文件版无 background：classify 直接 await edge 的 HTTP 请求，无法真正中止，
+    // 这里只标记取消，让迟到的判定结果不再回写、覆盖用户刚做的操作。
+    // （上游扩展版还会 send {type:"cancel_classify"}，本版 send 不支持该消息，故不发。）
+    if (running && !running.canceled) running.canceled = true;
+  }
+
+  async function reportAccount(key, sig) {
+    cancelClassify(key);
     const resp = await send({ type: "report_spam", signals: stripIsProfile(sig) });
     if (!resp.ok) throw new Error(resp.error || t("reportFailed"));
   }
@@ -2445,24 +2458,21 @@
     return rest;
   }
 
+  function badgeActions(anchor, key, sig) {
+    return {
+      onBlock: () => void blockAccount(key, sig),
+      onHide: () => hideTweet(anchor),
+      onReport: () => reportAccount(key, sig),
+      onAppeal: () => window.open(BRAND.appealNewIssue, "_blank", "noopener"),
+      onCheck: () => void classify(anchor, key, sig),
+      canReport,
+    };
+  }
+
   function badgeFor(anchor, key, sig, v, note, source = "fresh") {
     tallyScan(key);
     clearMounts(anchor);
-    mountBadge(anchor, () =>
-      createBadge(
-        v,
-        {
-          onBlock: () => void blockAccount(key, sig),
-          onHide: () => hideTweet(anchor),
-          onReport: () => reportAccount(sig),
-          onAppeal: () => window.open(BRAND.appealNewIssue, "_blank", "noopener"),
-          onCheck: () => void classify(anchor, key, sig),
-          canReport,
-        },
-        note,
-        source,
-      ),
-    );
+    mountBadge(anchor, () => createBadge(v, badgeActions(anchor, key, sig), note, source));
   }
 
   function renderCached(anchor, key, sig, c) {
@@ -2482,10 +2492,14 @@
 
   async function classify(anchor, key, sig) {
     const running = inflight.get(key);
-    if (running) return running;
-    mountStatus(anchor, "analyzing");
+    if (running) return running.promise;
+    const state = { canceled: false, promise: Promise.resolve() };
+    mountStatus(anchor, "analyzing", badgeActions(anchor, key, sig));
     const p = (async () => {
       const resp = await send({ type: "classify", signals: stripIsProfile(sig) });
+      // 用户已操作（拉黑/上报会 cancel 本轮）或已被更新的一轮取代时跳过回写，
+      // 否则迟到的判定会覆盖掉用户刚触发的「拉黑中/已拉黑」状态。
+      if (state.canceled || inflight.get(key) !== state) return;
       if (!resp.ok || !resp.data) {
         badgeFor(anchor, key, sig, null, resp.error || t("classifyFailed"));
         return;
@@ -2504,11 +2518,12 @@
         ...(sig.avatarUrl ? { avatarUrl: sig.avatarUrl } : {}),
       });
     })();
-    inflight.set(key, p);
+    state.promise = p;
+    inflight.set(key, state);
     try {
       await p;
     } finally {
-      inflight.delete(key);
+      if (inflight.get(key) === state) inflight.delete(key);
     }
   }
 
@@ -2618,6 +2633,15 @@
     scanTimer = setTimeout(scan, delay);
   }
 
+  function setBlockState(f, state) {
+    if (!f) return;
+    if (state.queued !== undefined) f.blockQueued = state.queued;
+    if (state.active !== undefined) f.blockActive = state.active;
+    if (state.failed !== undefined) f.blockFailed = state.failed;
+    if (state.blocked !== undefined) f.blocked = state.blocked;
+    if (state.source !== undefined) f.blockSource = state.source;
+  }
+
   async function finalizeBlocked(key, sig, source = "manual") {
     addBlocked(key);
     if (sig.userId) addBlocked(sig.userId);
@@ -2636,23 +2660,15 @@
     if (source === "manual" || source === "block_all") {
       void send({ type: "confirm_spam", signals: stripIsProfile(sig) });
     }
-    if (f) {
-      f.blocked = true;
-      f.blockQueued = false;
-      f.blockActive = false;
-      f.blockFailed = false;
-      f.blockSource = source;
-    }
+    setBlockState(f, { blocked: true, queued: false, active: false, failed: false, source });
     renderBubble();
   }
 
   async function blockAccount(key, sig) {
+    cancelClassify(key);
     const active = findFinding(sig);
     if (active) {
-      active.blockQueued = false;
-      active.blockActive = true;
-      active.blockFailed = false;
-      active.blockSource = "manual";
+      setBlockState(active, { queued: false, active: true, failed: false, source: "manual" });
       renderBubble();
     }
     const attempt = await coordinatedApiBlock(sig.userId, sig.handle);
@@ -2660,12 +2676,7 @@
       await finalizeBlocked(key, sig);
       return true;
     }
-    const f = findFinding(sig);
-    if (f) {
-      f.blockQueued = false;
-      f.blockActive = false;
-      f.blockFailed = true;
-    }
+    setBlockState(findFinding(sig), { queued: false, active: false, failed: true });
     renderBubble();
     return false;
   }
@@ -2720,10 +2731,7 @@
       const it = queue[0];
       const activeFinding = findFinding(it.sig);
       if (activeFinding) {
-        activeFinding.blockQueued = false;
-        activeFinding.blockActive = true;
-        activeFinding.blockFailed = false;
-        activeFinding.blockSource = it.source;
+        setBlockState(activeFinding, { queued: false, active: true, failed: false, source: it.source });
         renderBubble();
       }
       const attempt = await coordinatedApiBlock(it.sig.userId, it.sig.handle).catch(() => ({ ok: false, retryable: true }));
@@ -2735,20 +2743,13 @@
       } else {
         it.tries++;
         if (!attempt.retryable || it.tries >= 6) {
-          const f = findFinding(it.sig);
-          if (f) {
-            f.blockQueued = false;
-            f.blockActive = false;
-            f.blockFailed = true;
-          }
+          setBlockState(findFinding(it.sig), { queued: false, active: false, failed: true });
           queue.shift();
           renderBubble();
         } else {
           const f = findFinding(it.sig);
           if (f) {
-            f.blockQueued = true;
-            f.blockActive = false;
-            f.blockFailed = false;
+            setBlockState(f, { queued: true, active: false, failed: false });
             renderBubble();
           }
           await sleep(retryDelayForAttempt(attempt, it.tries));
